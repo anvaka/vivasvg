@@ -6,7 +6,7 @@ var svgDoc = new svg.Document(document.body);
 var collection = new svg.Collection();
 
 collection.setItemTemplate([
-  '<rect x="{{x}}" y="{{y}}" fill="{{color}}" width="10px" height="10px"></rect>',
+  '<text x="{{x}}" y="{{y}}" fill="{{color}}" >{{color}}</text>',
 ].join('\n'));
 
 collection.setItemSource(points);
