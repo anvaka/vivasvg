@@ -1,5 +1,5 @@
 module.exports = {
   Document: require('./lib/document'),
-  Collection: require('./lib/collection'),
+  ItemsControl: require('./lib/itemsControl'),
   ContentControl: require('./lib/contentControl')
 };
