@@ -2,8 +2,8 @@ var points = createRandomPoints();
 
 var svg = require('../');
 
-var svgDoc = svg.document(document.body);
-var collection = svg.collection();
+var svgDoc = new svg.Document(document.body);
+var collection = new svg.Collection();
 
 collection.setItemTemplate('<rect x="{{x}}" y="{{y}}" fill="{{color}}" width="10px" height="10px"></rect>');
 collection.setItemSource(points);

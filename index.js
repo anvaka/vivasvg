@@ -1,4 +1,4 @@
 module.exports = {
-  document: require('./lib/document'),
-  collection: require('./lib/collection')
+  Document: require('./lib/document'),
+  Collection: require('./lib/collection')
 };
