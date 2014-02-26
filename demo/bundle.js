@@ -1,14 +1,15 @@
 ;(function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);throw new Error("Cannot find module '"+o+"'")}var f=n[o]={exports:{}};t[o][0].call(f.exports,function(e){var n=t[o][1][e];return s(n?n:e)},f,f.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
-var points = createRandomPoints();
-
 var svg = require('../');
 
-var svgDoc = svg.document(document.body);
-var collection = svg.collection();
+var dataContext = { points: createRandomPoints(10) };
+var svgDoc = new svg.Document(document.body);
+var contentControl = new svg.ContentControl([
+    '<items source="{{points}}">',
+      '<text x="{{x}}" y="{{y}}" fill="{{color}}">{{color}}</text>',
+    '</items>'
+  ].join('\n'), dataContext);
 
-collection.setItemTemplate('<rect x="{{x}}" y="{{y}}" fill="{{color}}" width="10px" height="10px"></rect>');
-collection.setItemSource(points);
-svgDoc.appendChild(collection);
+svgDoc.appendChild(contentControl);
 svgDoc.render();
 
 function createRandomPoints(count) {
@@ -18,7 +19,7 @@ function createRandomPoints(count) {
     points.push({
       x: Math.random() * 640,
       y: Math.random() * 480,
-      fill: colors[(Math.random() * colors.length) | 0]
+      color: colors[(Math.random() * colors.length) | 0]
     });
   }
   return points;
@@ -29,40 +30,237 @@ module.exports = ["#8FBC8F","#EEE8AA","#DC143C","#8A2BE2","#C0C0C0","#00008B","#
 
 },{}],3:[function(require,module,exports){
 module.exports = {
-  document: require('./lib/document'),
-  collection: require('./lib/collection')
+  Document: require('./lib/document'),
+  Collection: require('./lib/collection'),
+  ContentControl: require('./lib/contentControl')
 };
 
-},{"./lib/collection":4,"./lib/document":5}],4:[function(require,module,exports){
-module.exports = collection;
+},{"./lib/collection":5,"./lib/contentControl":6,"./lib/document":7}],4:[function(require,module,exports){
+module.exports = function createBindReplacement(model) {
+  return function bindingSubstitue(match, name) {
+    var subtree = name.split('.');
+    var localModel = model;
 
-function collection() {
+    for (var i = 0; i < subtree.length; ++i) {
+      localModel = localModel[subtree[i]];
+      // Attribute is not found on model. TODO: should we show warning?
+      if (!localModel) return '';
+    }
 
-  return {
-    setItemTemplate : function (itemTemplate) {
-    },
-
-    setItemSource : function (itemSource) {
-    },
+    return localModel;
   };
-}
-
+};
 
 },{}],5:[function(require,module,exports){
-module.exports = svgDocument;
+module.exports = Collection;
 
-function svgDocument(container) {
+var UIElement = require('./uiElement');
 
-  return {
-    appendChild: function (child) {
-
-    },
-
-    render: function () {
-    }
-  };
+function Collection() {
+  UIElement.call(this);
+  this._dom = require('./svg')('g');
+  this._initialized = false;
 }
 
+Collection.prototype = Object.create(UIElement.prototype);
+Collection.prototype.constructor = Collection;
+
+Collection.prototype.setItemTemplate = function (itemTemplate) {
+  this._itemTemplate = itemTemplate;
+  this._initialized = false;
+};
+
+Collection.prototype.setItemSource = function (itemSource) {
+  this._itemSource = itemSource;
+  this._initialized = false;
+};
+
+Collection.prototype.markupPrototype = function (markup) {
+  var source = markup.getAttributeNS(null, 'source');
+  // todo: should be a better binding mechanism
+  var replacer = require('./bindingReplace')(this._dataContext);
+  var match = source.match(/{{(.+?)}}/);
+  if (match) {
+    this.setItemSource(replacer(null, match[1]));
+  }
+
+  this.setItemTemplate(markup.innerHTML);
+};
+
+Collection.prototype.render = function () {
+  if (!this._initialized) {
+    this._initialize();
+  }
+
+  var children = this._children;
+  for (var i = 0; i < children.length; ++i) {
+    children[i].render();
+  }
+};
+
+Collection.prototype._initialize = function () {
+  if (!this._itemSource) return;
+
+  var ContentControl = require('./contentControl');
+  var nodePrototype = require('./domParser')(this._itemTemplate);
+
+  var itemSource = this._itemSource;
+  for (var i = 0; i < itemSource.length; ++i) {
+    this.appendChild(new ContentControl(nodePrototype, itemSource[i]));
+  }
+
+  this._initialized = true;
+};
+
+},{"./bindingReplace":4,"./contentControl":6,"./domParser":8,"./svg":10,"./uiElement":11}],6:[function(require,module,exports){
+module.exports = ContentControl;
+
+var UIElement = require('./uiElement');
+var extensions = require('./extensions')();
+
+function ContentControl(protoNodes, model) {
+  UIElement.call(this);
+
+  if (typeof protoNodes === 'string') {
+    protoNodes = require('./domParser')(protoNodes);
+  }
+
+  this._dom = compileProtoNodes(protoNodes, model, this);
+}
+
+ContentControl.prototype = Object.create(UIElement.prototype);
+ContentControl.prototype.constructor = ContentControl;
+
+function compileProtoNodes(nodes, model, logicalParent) {
+  // TODO: group is not always required. E.g. when nodes length === 1, the node
+  // itself should be returned
+  var g = require('./svg')('g');
+  var replacer = require('./bindingReplace')(model);
+
+  compileSubtree(nodes, g);
+
+  return g;
+
+  function compileSubtree(nodes, visualParent) {
+    for (var i = 0; i < nodes.length; ++i) {
+      var protoNode = nodes[i];
+      if (protoNode.localName in extensions) {
+        // this is custom node, delegate its creation to handler
+        var Ctor = extensions[protoNode.localName];
+        var child = new Ctor();
+        child.dataContext(model);
+        child.markupPrototype(protoNode);
+        logicalParent.appendChild(child, visualParent);
+      } else {
+        // regular svg, just add it to visual parent
+        var cloneSubtree = protoNode.nodeType === 1; // text node
+        var node = protoNode.cloneNode(cloneSubtree);
+        bind(node, replacer);
+        visualParent.appendChild(node);
+        var children = protoNode.children;
+        if (children && children.length > 0) {
+          compileSubtree(children, node);
+        }
+      }
+    }
+  }
+}
+
+function bind(node, replacer) {
+  var newValue;
+  if (node.attributes) {
+    for (var i = 0; i < node.attributes.length; ++i) {
+      var attr = node.attributes[i];
+      newValue = attr.nodeValue.replace(/{{(.+?)}}/, replacer);
+      if (attr.nodeValue !== newValue) {
+        node.setAttributeNS(attr.namespaceURI, attr.localName, newValue);
+      }
+    }
+  }
+  if (node.nodeType === 1) { // TEXT_NODE
+    newValue = node.textContent.replace(/{{(.+?)}}/g, replacer);
+    if (newValue !== node.textContent) {
+      node.textContent = newValue;
+    }
+  }
+}
+
+},{"./bindingReplace":4,"./domParser":8,"./extensions":9,"./svg":10,"./uiElement":11}],7:[function(require,module,exports){
+module.exports = Document;
+
+var UIElement = require('./uiElement');
+
+function Document(container) {
+  UIElement.call(this);
+  this._dom = require('./svg')('svg');
+  container.appendChild(this._dom);
+}
+
+Document.prototype = Object.create(UIElement.prototype);
+Document.prototype.constructor = Document;
+
+},{"./svg":10,"./uiElement":11}],8:[function(require,module,exports){
+var parser = new DOMParser();
+
+module.exports = function (template) {
+  // todo: error handling
+  return parser.parseFromString('<g xmlns="http://www.w3.org/2000/svg">' + template + '</g>', 'text/xml').children[0].childNodes;
+};
+
+},{}],9:[function(require,module,exports){
+module.exports = function () {
+  return {
+    'items': require('./collection')
+  };
+};
+
+},{"./collection":5}],10:[function(require,module,exports){
+var svgns = 'http://www.w3.org/2000/svg';
+
+module.exports = function (elementName) {
+  return document.createElementNS(svgns, elementName);
+};
+
+},{}],11:[function(require,module,exports){
+module.exports = UIElement;
+
+function UIElement() {
+  this._children = null;
+  this._parent = null;
+}
+
+UIElement.prototype.render = function () {
+  if (this._children) {
+    this._children.forEach(renderChild);
+  }
+};
+
+UIElement.prototype.appendChild = function (child, visualParent) {
+  (this._children || (this._children = [])).push(child);
+  child._setParent(this);
+  child._appendToDom(visualParent || this._dom);
+};
+
+UIElement.prototype.dataContext = function (context) {
+  this._dataContext = context;
+};
+
+UIElement.prototype.markupPrototype = function (proto) {
+}; // no-op
+
+UIElement.prototype._setParent = function (parent) {
+  this._parent = parent;
+};
+
+UIElement.prototype._appendToDom = function (dom) {
+  if (this._dom) {
+    dom.appendChild(this._dom);
+  }
+};
+
+function renderChild(child) {
+  child.render();
+}
 
 },{}]},{},[1])
 ;

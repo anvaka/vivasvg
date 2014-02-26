@@ -1,16 +1,14 @@
-var points = createRandomPoints(1);
-
 var svg = require('../');
 
+var dataContext = { points: createRandomPoints(10) };
 var svgDoc = new svg.Document(document.body);
-var collection = new svg.Collection();
+var contentControl = new svg.ContentControl([
+    '<items source="{{points}}">',
+      '<text x="{{x}}" y="{{y}}" fill="{{color}}">{{color}}</text>',
+    '</items>'
+  ].join('\n'), dataContext);
 
-collection.setItemTemplate([
-  '<text x="{{x}}" y="{{y}}" fill="{{color}}" >{{color}}</text>',
-].join('\n'));
-
-collection.setItemSource(points);
-svgDoc.appendChild(collection);
+svgDoc.appendChild(contentControl);
 svgDoc.render();
 
 function createRandomPoints(count) {
