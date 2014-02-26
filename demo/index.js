@@ -1,4 +1,4 @@
-var points = createRandomPoints();
+var points = createRandomPoints(1);
 
 var svg = require('../');
 
@@ -17,7 +17,7 @@ function createRandomPoints(count) {
     points.push({
       x: Math.random() * 640,
       y: Math.random() * 480,
-      fill: colors[(Math.random() * colors.length) | 0]
+      color: colors[(Math.random() * colors.length) | 0]
     });
   }
   return points;
