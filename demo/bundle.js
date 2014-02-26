@@ -25,47 +25,35 @@ module.exports = function createRandomPoints(count) {
 
 },{"./randomColors":2}],4:[function(require,module,exports){
 module.exports = {
-  Document: require('./lib/document'),
-  ItemsControl: require('./lib/itemsControl'),
-  ContentControl: require('./lib/contentControl'),
   bootstrap: require('./lib/bootstrap')
 };
 
-},{"./lib/bootstrap":6,"./lib/contentControl":7,"./lib/document":8,"./lib/itemsControl":11}],5:[function(require,module,exports){
-module.exports = function createBindReplacement(model) {
-  return function bindingSubstitue(match, name) {
-    var subtree = name.split('.');
-    var localModel = model;
+var controls = require('./lib/controls');
+Object.keys(controls).forEach(exportControl);
 
-    for (var i = 0; i < subtree.length; ++i) {
-      localModel = localModel[subtree[i]];
-      // Attribute is not found on model. TODO: should we show warning?
-      if (!localModel) return '';
-    }
+function exportControl(name) {
+  module.exports[name] = controls[name];
+}
 
-    return localModel;
-  };
-};
-
-},{}],6:[function(require,module,exports){
+},{"./lib/bootstrap":5,"./lib/controls":8}],5:[function(require,module,exports){
 module.exports = function (domRoot, dataContext) {
   var content = domRoot.innerHTML;
   while (domRoot.firstChild) {
     domRoot.removeChild(domRoot.firstChild);
   }
 
-  var svgDoc = require('./document')(domRoot);
-  var contentControl = require('./contentControl')(content, dataContext);
+  var svgDoc = require('./controls/document')(domRoot);
+  var contentControl = require('./controls/contentControl')(content, dataContext);
 
   svgDoc.appendChild(contentControl);
   svgDoc.render();
 };
 
-},{"./contentControl":7,"./document":8}],7:[function(require,module,exports){
+},{"./controls/contentControl":6,"./controls/document":7}],6:[function(require,module,exports){
 module.exports = ContentControl;
 
 var UIElement = require('./uiElement');
-var extensions = require('./extensions')();
+var extensions = require('../extensions')();
 
 function ContentControl(protoNodes, model) {
   if (!(this instanceof ContentControl)){
@@ -75,7 +63,7 @@ function ContentControl(protoNodes, model) {
   UIElement.call(this);
 
   if (typeof protoNodes === 'string') {
-    protoNodes = require('./domParser')(protoNodes);
+    protoNodes = require('../utils/domParser')(protoNodes);
   }
 
   this._dom = compileProtoNodes(protoNodes, model, this);
@@ -87,8 +75,8 @@ ContentControl.prototype.constructor = ContentControl;
 function compileProtoNodes(nodes, model, logicalParent) {
   // TODO: group is not always required. E.g. when nodes length === 1, the node
   // itself should be returned
-  var g = require('./svg')('g');
-  var replacer = require('./bindingReplace')(model);
+  var g = require('../utils/svg')('g');
+  var replacer = require('../utils/bindingReplace')(model);
 
   compileSubtree(nodes, g);
 
@@ -138,7 +126,7 @@ function bind(node, replacer) {
   }
 }
 
-},{"./bindingReplace":5,"./domParser":9,"./extensions":10,"./svg":12,"./uiElement":13}],8:[function(require,module,exports){
+},{"../extensions":11,"../utils/bindingReplace":12,"../utils/domParser":13,"../utils/svg":14,"./uiElement":10}],7:[function(require,module,exports){
 module.exports = Document;
 
 var UIElement = require('./uiElement');
@@ -153,7 +141,7 @@ function Document(container) {
   if (container && container.localName === 'svg') {
     this._dom = container;
   } else {
-    this._dom = require('./svg')('svg');
+    this._dom = require('../utils/svg')('svg');
     container.appendChild(this._dom);
   }
 }
@@ -161,22 +149,15 @@ function Document(container) {
 Document.prototype = Object.create(UIElement.prototype);
 Document.prototype.constructor = Document;
 
-},{"./svg":12,"./uiElement":13}],9:[function(require,module,exports){
-var parser = new DOMParser();
-
-module.exports = function (template) {
-  // todo: error handling
-  return parser.parseFromString('<g xmlns="http://www.w3.org/2000/svg">' + template + '</g>', 'text/xml').children[0].childNodes;
+},{"../utils/svg":14,"./uiElement":10}],8:[function(require,module,exports){
+module.exports = {
+  Document: require('./document'),
+  ItemsControl: require('./itemsControl'),
+  ContentControl: require('./contentControl'),
+  UIElement: require('./uiElement')
 };
 
-},{}],10:[function(require,module,exports){
-module.exports = function () {
-  return {
-    'items': require('./itemsControl')
-  };
-};
-
-},{"./itemsControl":11}],11:[function(require,module,exports){
+},{"./contentControl":6,"./document":7,"./itemsControl":9,"./uiElement":10}],9:[function(require,module,exports){
 module.exports = ItemsControl;
 
 var UIElement = require('./uiElement');
@@ -187,7 +168,7 @@ function ItemsControl() {
   }
 
   UIElement.call(this);
-  this._dom = require('./svg')('g');
+  this._dom = require('../utils/svg')('g');
   this._initialized = false;
 }
 
@@ -207,7 +188,7 @@ ItemsControl.prototype.setItemSource = function (itemSource) {
 ItemsControl.prototype.markupPrototype = function (markup) {
   var source = markup.getAttributeNS(null, 'source');
   // todo: should be a better binding mechanism
-  var replacer = require('./bindingReplace')(this._dataContext);
+  var replacer = require('../utils/bindingReplace')(this._dataContext);
   var match = source.match(/{{(.+?)}}/);
   if (match) {
     this.setItemSource(replacer(null, match[1]));
@@ -231,7 +212,7 @@ ItemsControl.prototype._initialize = function () {
   if (!this._itemSource) return;
 
   var ContentControl = require('./contentControl');
-  var nodePrototype = require('./domParser')(this._itemTemplate);
+  var nodePrototype = require('../utils/domParser')(this._itemTemplate);
 
   var itemSource = this._itemSource;
   for (var i = 0; i < itemSource.length; ++i) {
@@ -241,14 +222,7 @@ ItemsControl.prototype._initialize = function () {
   this._initialized = true;
 };
 
-},{"./bindingReplace":5,"./contentControl":7,"./domParser":9,"./svg":12,"./uiElement":13}],12:[function(require,module,exports){
-var svgns = 'http://www.w3.org/2000/svg';
-
-module.exports = function (elementName) {
-  return document.createElementNS(svgns, elementName);
-};
-
-},{}],13:[function(require,module,exports){
+},{"../utils/bindingReplace":12,"../utils/domParser":13,"../utils/svg":14,"./contentControl":6,"./uiElement":10}],10:[function(require,module,exports){
 module.exports = UIElement;
 
 function UIElement() {
@@ -292,6 +266,44 @@ UIElement.prototype._appendToDom = function (dom) {
 function renderChild(child) {
   child.render();
 }
+
+},{}],11:[function(require,module,exports){
+module.exports = function () {
+  return {
+    'items': require('./controls/itemsControl')
+  };
+};
+
+},{"./controls/itemsControl":9}],12:[function(require,module,exports){
+module.exports = function createBindReplacement(model) {
+  return function bindingSubstitue(match, name) {
+    var subtree = name.split('.');
+    var localModel = model;
+
+    for (var i = 0; i < subtree.length; ++i) {
+      localModel = localModel[subtree[i]];
+      // Attribute is not found on model. TODO: should we show warning?
+      if (!localModel) return '';
+    }
+
+    return localModel;
+  };
+};
+
+},{}],13:[function(require,module,exports){
+var parser = new DOMParser();
+
+module.exports = function (template) {
+  // todo: error handling
+  return parser.parseFromString('<g xmlns="http://www.w3.org/2000/svg">' + template + '</g>', 'text/xml').children[0].childNodes;
+};
+
+},{}],14:[function(require,module,exports){
+var svgns = 'http://www.w3.org/2000/svg';
+
+module.exports = function (elementName) {
+  return document.createElementNS(svgns, elementName);
+};
 
 },{}]},{},[1])
 ;
