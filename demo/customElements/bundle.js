@@ -16,12 +16,13 @@ Arrow.prototype = Object.create(UIElement.prototype);
 Arrow.prototype.constructor = Arrow;
 
 Arrow.prototype._appendToDom = function (parentDom) {
-  debugger;
   this._dom = compileMarkup(this._markup, this._dataContext, this);
   parentDom.appendChild(this._dom);
 };
 
 function compileMarkup(markup, model, arrow) {
+  // todo: looks like some of the code below should belong to UIElement
+  addArrowTriangle(arrow);
   var path = vivasvg.svg('path');
   var bindingParser = vivasvg.bindingParser(model);
 
@@ -36,10 +37,27 @@ function compileMarkup(markup, model, arrow) {
   if (from && to) {
     var source = from.provide();
     var dest = to.provide();
-    path.setAttributeNS(null, 'd', 'M' + source.x +',' + source.y + 'L' + dest.x + ',' + dest.y);
+
+    from.on('changed', function () { renderPath(from.provide(), to.provide()); });
+    to.on('changed', function () { renderPath(from.provide(), to.provide()); });
+
+    renderPath(source, dest);
   }
+  path.setAttributeNS(null, 'marker-end', 'url(#ArrowTriangle)');
 
   return path;
+
+  function renderPath(source, dest) {
+    path.setAttributeNS(null, 'd', 'M' + source.x +',' + source.y + 'L' + dest.x + ',' + dest.y);
+  }
+}
+
+function addArrowTriangle(arrow) {
+  var ownerDocument = arrow.getOwnerDocument(arrow);
+  if (ownerDocument && !ownerDocument.ArrowAugmented) {
+    ownerDocument.addDef('<marker id="ArrowTriangle" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="strokeWidth" markerWidth="10" markerHeight="5" orient="auto" style="fill: deepskyblue"><path d="M 0 0 L 10 5 L 0 10 z"></path></marker>');
+    ownerDocument.ArrowAugmented = true; // todo: should be better way
+  }
 }
 
 },{"../../":3}],2:[function(require,module,exports){
@@ -51,10 +69,25 @@ var dataContext = {
   color: 'deepskyblue'
 };
 
+var eventify = require('ngraph.events');
+eventify(dataContext);
+
 var vivasvg = require('../../');
 vivasvg.bootstrap(document.getElementById('scene'), dataContext);
 
-},{"../../":3,"./arrow":1}],3:[function(require,module,exports){
+renderFrame();
+
+function renderFrame() {
+  requestAnimationFrame(renderFrame);
+
+  var timer = Date.now() * 0.002;
+  dataContext.from.x = 100 + Math.cos(timer) * 100;
+  dataContext.from.y = 100 + Math.sin(timer) * 100;
+  dataContext.fire('from');
+}
+
+
+},{"../../":3,"./arrow":1,"ngraph.events":15}],3:[function(require,module,exports){
 module.exports = {
   svg: require('./lib/utils/svg'),
   bootstrap: require('./lib/bootstrap'),
@@ -96,8 +129,10 @@ module.exports = function (element, bindingParser) {
 
 },{}],5:[function(require,module,exports){
 var BINDING_REGEX = /{{(.+?)}}/;
+var eventify = require('ngraph.events');
 
 module.exports = function (model) {
+  var modelIsActive = typeof model.on === 'function';
 
   return {
     parse: function (expression) {
@@ -125,14 +160,24 @@ module.exports = function (model) {
         };
       }
 
-      return {
-        provide: provider
+      var api = {
+        provide: provider,
       };
+
+      eventify(api);
+
+      if (modelIsActive) {
+        model.on(match[1], function () {
+          api.fire('changed');
+        });
+      }
+
+      return api;
     }
   };
 };
 
-},{}],6:[function(require,module,exports){
+},{"ngraph.events":15}],6:[function(require,module,exports){
 module.exports = function (domRoot, dataContext) {
   var markup = domRoot.innerHTML;
   while (domRoot.firstChild) {
@@ -225,6 +270,8 @@ function Document(container) {
 
   UIElement.call(this);
 
+  this._ownerDocument = this;
+
   if (container && container.localName === 'svg') {
     this._dom = container;
   } else {
@@ -236,7 +283,28 @@ function Document(container) {
 Document.prototype = Object.create(UIElement.prototype);
 Document.prototype.constructor = Document;
 
-},{"../utils/svg":14,"./uiElement":11}],9:[function(require,module,exports){
+Document.prototype.addDef = function (defsMarkup) {
+  if (!defsMarkup) throw new Error('DefsMarkup is required argument for Document.addDef() method');
+
+  var defs = getDefsElement(this._dom);
+  var defContent = require('../utils/domParser')(defsMarkup);
+  for (var i = 0; i < defContent.length; ++i) {
+    defs.appendChild(defContent[i]);
+  }
+};
+
+function getDefsElement(svgRoot) {
+  var children = svgRoot.childNodes;
+  for (var i = 0; children.length; ++i) {
+    if (children[i].localName === 'defs') return children[i];
+  }
+
+  var defs = require('../utils/svg')('defs');
+  svgRoot.appendChild(defs);
+  return defs;
+}
+
+},{"../utils/domParser":13,"../utils/svg":14,"./uiElement":11}],9:[function(require,module,exports){
 module.exports = {
   Document: require('./document'),
   ItemsControl: require('./itemsControl'),
@@ -337,12 +405,17 @@ UIElement.prototype.dataContext = function (context) {
   this._dataContext = context;
 };
 
+UIElement.prototype.getOwnerDocument = function () {
+  return this._ownerDocument;
+};
+
 UIElement.prototype.markup = function (markup) {
   this._markup = markup;
 };
 
 UIElement.prototype._setParent = function (parent) {
   this._parent = parent;
+  this._ownerDocument = parent._ownerDocument;
   this._inheritDataContext();
 };
 
@@ -387,6 +460,93 @@ var svgns = 'http://www.w3.org/2000/svg';
 module.exports = function (elementName) {
   return document.createElementNS(svgns, elementName);
 };
+
+},{}],15:[function(require,module,exports){
+module.exports = function(subject) {
+  validateSubject(subject);
+
+  var eventsStorage = createEventsStorage(subject);
+  subject.on = eventsStorage.on;
+  subject.off = eventsStorage.off;
+  subject.fire = eventsStorage.fire;
+  return subject;
+};
+
+function createEventsStorage(subject) {
+  // Store all event listeners to this hash. Key is event name, value is array
+  // of callback records.
+  //
+  // A callback record consists of callback function and its optional context:
+  // { 'eventName' => [{callback: function, ctx: object}] }
+  var registeredEvents = {};
+
+  return {
+    on: function (eventName, callback, ctx) {
+      if (typeof callback !== 'function') {
+        throw new Error('callback is expected to be a function');
+      }
+      if (!registeredEvents.hasOwnProperty(eventName)) {
+        registeredEvents[eventName] = [];
+      }
+      registeredEvents[eventName].push({callback: callback, ctx: ctx});
+
+      return subject;
+    },
+
+    off: function (eventName, callback) {
+      var wantToRemoveAll = (typeof eventName === 'undefined');
+      if (wantToRemoveAll) {
+        // Killing old events storage should be enough in this case:
+        registeredEvents = {};
+        return subject;
+      }
+
+      if (registeredEvents.hasOwnProperty(eventName)) {
+        var deleteAllCallbacksForEvent = (typeof callback !== 'function');
+        if (deleteAllCallbacksForEvent) {
+          delete registeredEvents[eventName];
+        } else {
+          var callbacks = registeredEvents[eventName];
+          for (var i = 0; i < callbacks.length; ++i) {
+            if (callbacks[i].callback === callback) {
+              callbacks.splice(i, 1);
+            }
+          }
+        }
+      }
+
+      return subject;
+    },
+
+    fire: function (eventName) {
+      var noEventsToFire = !registeredEvents.hasOwnProperty(eventName);
+      if (noEventsToFire) {
+        return subject; 
+      }
+
+      var callbacks = registeredEvents[eventName];
+      var fireArguments = Array.prototype.splice.call(arguments, 1);
+      for(var i = 0; i < callbacks.length; ++i) {
+        var callbackInfo = callbacks[i];
+        callbackInfo.callback.apply(callbackInfo.ctx, fireArguments);
+      }
+
+      return subject;
+    }
+  };
+}
+
+function validateSubject(subject) {
+  if (!subject) {
+    throw new Error('Eventify cannot use falsy object as events subject');
+  }
+  var reservedWords = ['on', 'fire', 'off'];
+  for (var i = 0; i < reservedWords.length; ++i) {
+    if (subject.hasOwnProperty(reservedWords[i])) {
+      throw new Error("Subject cannot be eventified, since it already has property '" + reservedWords[i] + "'");
+    }
+  }
+}
 
 },{}]},{},[2])
 ;

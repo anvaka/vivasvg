@@ -36,11 +36,19 @@ function compileMarkup(markup, model, arrow) {
   if (from && to) {
     var source = from.provide();
     var dest = to.provide();
-    path.setAttributeNS(null, 'd', 'M' + source.x +',' + source.y + 'L' + dest.x + ',' + dest.y);
+
+    from.on('changed', function () { renderPath(from.provide(), to.provide()); });
+    to.on('changed', function () { renderPath(from.provide(), to.provide()); });
+
+    renderPath(source, dest);
   }
   path.setAttributeNS(null, 'marker-end', 'url(#ArrowTriangle)');
 
   return path;
+
+  function renderPath(source, dest) {
+    path.setAttributeNS(null, 'd', 'M' + source.x +',' + source.y + 'L' + dest.x + ',' + dest.y);
+  }
 }
 
 function addArrowTriangle(arrow) {
