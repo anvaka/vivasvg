@@ -20,6 +20,7 @@ Arrow.prototype._appendToDom = function (parentDom) {
 };
 
 function compileMarkup(markup, model, arrow) {
+  // todo: looks like some of the code below should belong to UIElement
   addArrowTriangle(arrow);
   var path = vivasvg.svg('path');
   var bindingParser = vivasvg.bindingParser(model);
