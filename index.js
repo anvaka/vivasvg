@@ -1,5 +1,12 @@
 module.exports = {
-  bootstrap: require('./lib/bootstrap')
+  svg: require('./lib/utils/svg'),
+  bootstrap: require('./lib/bootstrap'),
+  bindingParser: require('./lib/binding/parser'),
+  registerControl: function (name, ctor) {
+    // todo: name collisions?
+    var extensions = require('./lib/extensions')();
+    extensions[name] = ctor;
+  }
 };
 
 var controls = require('./lib/controls');
