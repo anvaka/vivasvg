@@ -3,10 +3,12 @@
   <head>
     <meta http-equiv="content-type" content="text/html; charset=utf-8" />
     <title>Basic example</title>
+    <style type="text/css" media="all">
+      body { position: absolute; width: 100%; height: 100%; margin: 0; padding: 0 }
+    </style>
   </head>
   <body>
-
-    <svg id='scene'>
+    <svg id='scene' style="width:100%; height:100%">
       <items source="{{points}}">
         <text x="{{x}}" y="{{y}}" fill="{{color}}">{{color}}</text>
       </items>
