@@ -35,98 +35,148 @@ function exportControl(name) {
   module.exports[name] = controls[name];
 }
 
-},{"./lib/bootstrap":5,"./lib/controls":8}],5:[function(require,module,exports){
+},{"./lib/bootstrap":7,"./lib/controls":10}],5:[function(require,module,exports){
+module.exports = function (element, bindingParser) {
+  var binding;
+  var attributes = element.attributes;
+  if (attributes) {
+    for (var i = 0; i < attributes.length; ++i) {
+      var attr = attributes[i];
+      binding = bindingParser.parse(attr.nodeValue);
+      if (binding) {
+        element.setAttributeNS(attr.namespaceURI, attr.localName, binding.provide());
+      }
+    }
+  }
+  if (element.nodeType === 3) { // TEXT_NODE
+    binding = bindingParser.parse(element.nodeValue);
+    if (binding) {
+    debugger;
+      element.nodeValue = binding.provide();
+    }
+  }
+};
+
+},{}],6:[function(require,module,exports){
+var BINDING_REGEX = /{{(.+?)}}/;
+
+module.exports = function (model) {
+
+  return {
+    parse: function (expression) {
+      var match = expression.match(BINDING_REGEX);
+      if (!match) return; // no binding here;
+      // todo: process all matches (e.g. {{x}}, {{y}})
+      var modelPropertyPath = match[1].split('.');
+      var provider;
+
+      if (modelPropertyPath.length === 1) {
+        provider = function () {
+          return model[modelPropertyPath[0]];
+        };
+      } else {
+        provider = function () {
+          var localModel = model;
+          for (var i = 0; i < modelPropertyPath.length; ++i) {
+            localModel = localModel[modelPropertyPath[i]];
+            if (!localModel) {
+              return undefined;
+            }
+          }
+
+          return localModel;
+        };
+      }
+
+      return {
+        provide: provider
+      };
+    }
+  };
+};
+
+},{}],7:[function(require,module,exports){
 module.exports = function (domRoot, dataContext) {
-  var content = domRoot.innerHTML;
+  var markup = domRoot.innerHTML;
   while (domRoot.firstChild) {
     domRoot.removeChild(domRoot.firstChild);
   }
 
   var svgDoc = require('./controls/document')(domRoot);
-  var contentControl = require('./controls/contentControl')(content, dataContext);
+  svgDoc.dataContext(dataContext);
+
+  var contentControl = require('./controls/contentControl')();
+  contentControl.markup(markup);
 
   svgDoc.appendChild(contentControl);
   svgDoc.render();
 };
 
-},{"./controls/contentControl":6,"./controls/document":7}],6:[function(require,module,exports){
+},{"./controls/contentControl":8,"./controls/document":9}],8:[function(require,module,exports){
 module.exports = ContentControl;
 
 var UIElement = require('./uiElement');
 var extensions = require('../extensions')();
 
-function ContentControl(protoNodes, model) {
+function ContentControl() {
   if (!(this instanceof ContentControl)){
-    return new ContentControl(protoNodes, model);
+    return new ContentControl();
   }
 
   UIElement.call(this);
-
-  if (typeof protoNodes === 'string') {
-    protoNodes = require('../utils/domParser')(protoNodes);
-  }
-
-  this._dom = compileProtoNodes(protoNodes, model, this);
 }
 
 ContentControl.prototype = Object.create(UIElement.prototype);
 ContentControl.prototype.constructor = ContentControl;
 
-function compileProtoNodes(nodes, model, logicalParent) {
+ContentControl.prototype._appendToDom = function (parentDom) {
+  this._dom = compileMarkup(this._markup, this._dataContext, this);
+  parentDom.appendChild(this._dom);
+};
+
+function compileMarkup(nodes, model, logicalParent) {
+  if (typeof nodes === 'string') {
+    nodes = require('../utils/domParser')(nodes);
+  }
+
+  var bindingParser = require('../binding/parser')(model);
+  var bindElement = require('../binding/element');
+
   // TODO: group is not always required. E.g. when nodes length === 1, the node
   // itself should be returned
   var g = require('../utils/svg')('g');
-  var replacer = require('../utils/bindingReplace')(model);
-
   compileSubtree(nodes, g);
 
   return g;
 
   function compileSubtree(nodes, visualParent) {
     for (var i = 0; i < nodes.length; ++i) {
-      var protoNode = nodes[i];
-      if (protoNode.localName in extensions) {
-        // this is custom node, delegate its creation to handler
-        var Ctor = extensions[protoNode.localName];
-        var child = new Ctor();
-        child.dataContext(model);
-        child.markupPrototype(protoNode);
-        logicalParent.appendChild(child, visualParent);
-      } else {
-        // regular svg, just add it to visual parent
-        var cloneSubtree = protoNode.nodeType === 1; // text node
-        var node = protoNode.cloneNode(cloneSubtree);
-        bind(node, replacer);
-        visualParent.appendChild(node);
-        var children = protoNode.children;
-        if (children && children.length > 0) {
-          compileSubtree(children, node);
-        }
+      compileNode(nodes[i], visualParent);
+    }
+  }
+
+  function compileNode(nodePrototype, visualParent) {
+    if (nodePrototype.localName in extensions) {
+      // this is custom node, delegate its creation to handler
+      var Ctor = extensions[nodePrototype.localName];
+      var child = new Ctor();
+      child.markup(nodePrototype);
+      logicalParent.appendChild(child, visualParent);
+    } else {
+      // regular svg, just add it to visual parent
+      var node = nodePrototype.cloneNode(false);
+      bindElement(node, bindingParser);
+
+      visualParent.appendChild(node);
+      var children = nodePrototype.childNodes;
+      if (children && children.length > 0) {
+        compileSubtree(children, node);
       }
     }
   }
 }
 
-function bind(node, replacer) {
-  var newValue;
-  if (node.attributes) {
-    for (var i = 0; i < node.attributes.length; ++i) {
-      var attr = node.attributes[i];
-      newValue = attr.nodeValue.replace(/{{(.+?)}}/, replacer);
-      if (attr.nodeValue !== newValue) {
-        node.setAttributeNS(attr.namespaceURI, attr.localName, newValue);
-      }
-    }
-  }
-  if (node.nodeType === 1) { // TEXT_NODE
-    newValue = node.textContent.replace(/{{(.+?)}}/g, replacer);
-    if (newValue !== node.textContent) {
-      node.textContent = newValue;
-    }
-  }
-}
-
-},{"../extensions":11,"../utils/bindingReplace":12,"../utils/domParser":13,"../utils/svg":14,"./uiElement":10}],7:[function(require,module,exports){
+},{"../binding/element":5,"../binding/parser":6,"../extensions":13,"../utils/domParser":14,"../utils/svg":15,"./uiElement":12}],9:[function(require,module,exports){
 module.exports = Document;
 
 var UIElement = require('./uiElement');
@@ -149,7 +199,7 @@ function Document(container) {
 Document.prototype = Object.create(UIElement.prototype);
 Document.prototype.constructor = Document;
 
-},{"../utils/svg":14,"./uiElement":10}],8:[function(require,module,exports){
+},{"../utils/svg":15,"./uiElement":12}],10:[function(require,module,exports){
 module.exports = {
   Document: require('./document'),
   ItemsControl: require('./itemsControl'),
@@ -157,7 +207,7 @@ module.exports = {
   UIElement: require('./uiElement')
 };
 
-},{"./contentControl":6,"./document":7,"./itemsControl":9,"./uiElement":10}],9:[function(require,module,exports){
+},{"./contentControl":8,"./document":9,"./itemsControl":11,"./uiElement":12}],11:[function(require,module,exports){
 module.exports = ItemsControl;
 
 var UIElement = require('./uiElement');
@@ -168,8 +218,6 @@ function ItemsControl() {
   }
 
   UIElement.call(this);
-  this._dom = require('../utils/svg')('g');
-  this._initialized = false;
 }
 
 ItemsControl.prototype = Object.create(UIElement.prototype);
@@ -177,52 +225,54 @@ ItemsControl.prototype.constructor = ItemsControl;
 
 ItemsControl.prototype.setItemTemplate = function (itemTemplate) {
   this._itemTemplate = itemTemplate;
-  this._initialized = false;
 };
 
 ItemsControl.prototype.setItemSource = function (itemSource) {
   this._itemSource = itemSource;
-  this._initialized = false;
 };
 
-ItemsControl.prototype.markupPrototype = function (markup) {
-  var source = markup.getAttributeNS(null, 'source');
-  // todo: should be a better binding mechanism
-  var replacer = require('../utils/bindingReplace')(this._dataContext);
-  var match = source.match(/{{(.+?)}}/);
-  if (match) {
-    this.setItemSource(replacer(null, match[1]));
-  }
-
-  this.setItemTemplate(markup.innerHTML);
+ItemsControl.prototype._appendToDom = function (parentDom) {
+  this._dom = require('../utils/svg')('g');
+  appendChildren(this);
+  parentDom.appendChild(this._dom);
 };
 
-ItemsControl.prototype.render = function () {
-  if (!this._initialized) {
-    this._initialize();
-  }
-
-  var children = this._children;
-  for (var i = 0; i < children.length; ++i) {
-    children[i].render();
-  }
-};
-
-ItemsControl.prototype._initialize = function () {
-  if (!this._itemSource) return;
+function appendChildren(itemsControl) {
+  ensureCanAppendChildren(itemsControl);
 
   var ContentControl = require('./contentControl');
-  var nodePrototype = require('../utils/domParser')(this._itemTemplate);
+  var nodePrototype = require('../utils/domParser')(itemsControl._itemTemplate);
 
-  var itemSource = this._itemSource;
+  var itemSource = itemsControl._itemSource;
   for (var i = 0; i < itemSource.length; ++i) {
-    this.appendChild(new ContentControl(nodePrototype, itemSource[i]));
+    var contentControl = new ContentControl();
+    // override default data context to current item:
+    contentControl.dataContext(itemSource[i]);
+    contentControl.markup(nodePrototype);
+    itemsControl.appendChild(contentControl);
+  }
+}
+
+function ensureCanAppendChildren(itemsControl) {
+  if (itemsControl._markup && !itemsControl._itemSource) {
+    var markup = itemsControl._markup;
+    var source = markup.getAttributeNS(null, 'source');
+    // todo: should be a better binding mechanism
+    var bindingParser = require('../binding/parser')(itemsControl._dataContext);
+    var sourceBinding = bindingParser.parse(source);
+    if (sourceBinding) {
+      itemsControl.setItemSource(sourceBinding.provide());
+    }
+
+    itemsControl.setItemTemplate(markup.innerHTML);
   }
 
-  this._initialized = true;
-};
+  if (!itemsControl._itemSource || !itemsControl._itemTemplate) {
+    throw new Error('Can not use items control without itemsSource and itemTemplate');
+  }
+}
 
-},{"../utils/bindingReplace":12,"../utils/domParser":13,"../utils/svg":14,"./contentControl":6,"./uiElement":10}],10:[function(require,module,exports){
+},{"../binding/parser":6,"../utils/domParser":14,"../utils/svg":15,"./contentControl":8,"./uiElement":12}],12:[function(require,module,exports){
 module.exports = UIElement;
 
 function UIElement() {
@@ -250,11 +300,13 @@ UIElement.prototype.dataContext = function (context) {
   this._dataContext = context;
 };
 
-UIElement.prototype.markupPrototype = function (proto) {
-}; // no-op
+UIElement.prototype.markup = function (markup) {
+  this._markup = markup;
+};
 
 UIElement.prototype._setParent = function (parent) {
   this._parent = parent;
+  this._inheritDataContext();
 };
 
 UIElement.prototype._appendToDom = function (dom) {
@@ -263,42 +315,33 @@ UIElement.prototype._appendToDom = function (dom) {
   }
 };
 
+UIElement.prototype._inheritDataContext = function () {
+  if (!this._dataContext && this._parent) {
+    // is this good enough, or there is a better way?
+    this._dataContext = this._parent._dataContext;
+  }
+};
+
 function renderChild(child) {
   child.render();
 }
 
-},{}],11:[function(require,module,exports){
+},{}],13:[function(require,module,exports){
 module.exports = function () {
   return {
     'items': require('./controls/itemsControl')
   };
 };
 
-},{"./controls/itemsControl":9}],12:[function(require,module,exports){
-module.exports = function createBindReplacement(model) {
-  return function bindingSubstitue(match, name) {
-    var subtree = name.split('.');
-    var localModel = model;
-
-    for (var i = 0; i < subtree.length; ++i) {
-      localModel = localModel[subtree[i]];
-      // Attribute is not found on model. TODO: should we show warning?
-      if (!localModel) return '';
-    }
-
-    return localModel;
-  };
-};
-
-},{}],13:[function(require,module,exports){
+},{"./controls/itemsControl":11}],14:[function(require,module,exports){
 var parser = new DOMParser();
 
 module.exports = function (template) {
   // todo: error handling
-  return parser.parseFromString('<g xmlns="http://www.w3.org/2000/svg">' + template + '</g>', 'text/xml').children[0].childNodes;
+  return parser.parseFromString('<g xmlns="http://www.w3.org/2000/svg">' + template + '</g>', 'text/xml').children[0].children;
 };
 
-},{}],14:[function(require,module,exports){
+},{}],15:[function(require,module,exports){
 var svgns = 'http://www.w3.org/2000/svg';
 
 module.exports = function (elementName) {
