@@ -34,6 +34,7 @@ function compileMarkup(markup, model, arrow) {
 
   var from = bindingParser.parse(markup.getAttributeNS(null, 'from'));
   var to = bindingParser.parse(markup.getAttributeNS(null, 'to'));
+  var fromSeg, toSeg;
   if (from && to) {
     var source = from.provide();
     var dest = to.provide();
@@ -41,14 +42,20 @@ function compileMarkup(markup, model, arrow) {
     from.on('changed', function () { renderPath(from.provide(), to.provide()); });
     to.on('changed', function () { renderPath(from.provide(), to.provide()); });
 
-    renderPath(source, dest);
+    fromSeg = path.createSVGPathSegMovetoAbs(source.x, source.y);
+    toSeg = path.createSVGPathSegLinetoAbs(dest.x, dest.y);
+    path.pathSegList.appendItem(fromSeg);
+    path.pathSegList.appendItem(toSeg);
   }
   path.setAttributeNS(null, 'marker-end', 'url(#ArrowTriangle)');
 
   return path;
 
   function renderPath(source, dest) {
-    path.setAttributeNS(null, 'd', 'M' + source.x +',' + source.y + 'L' + dest.x + ',' + dest.y);
+    fromSeg.x = source.x;
+    fromSeg.y = source.y;
+    toSeg.x = dest.x;
+    toSeg.y = dest.y;
   }
 }
 
@@ -60,34 +67,82 @@ function addArrowTriangle(arrow) {
   }
 }
 
-},{"../../":3}],2:[function(require,module,exports){
-require('./arrow');
+},{"../../":4}],2:[function(require,module,exports){
+module.exports = ArrowModel;
 
-var dataContext = {
-  from : {x: 10, y: 10},
-  to: {x: 100, y: 100},
-  color: 'deepskyblue'
+function ArrowModel() {
+  this.from = {x: Math.random() * 640, y: Math.random() * 480};
+  this.to = {x: Math.random() * 640, y: Math.random() * 480};
+  this.color = 'deepskyblue';
+  this.vx = -3 + Math.random() * 6;
+  this.vy = -3 + Math.random() * 6;
+  this.length = 10 + Math.random() * 10;
+}
+
+ArrowModel.prototype.move = function (target) {
+  var x = this.from.x + this.vx;
+  var y = this.from.y + this.vy;
+  if (x < 0 || x > 640)  {
+    this.vx *= -1;
+    x = this.from.x + this.vx;
+  }
+  if (y < 0 || y > 480)  {
+    this.vy *= -1;
+    y = this.from.y + this.vy;
+  }
+  this.from.x = x;
+  this.from.y = y;
+  var x2 = target.x, y2 = target.y, x1 = this.from.x, y1 = this.from.y;
+  var dx = x2 - x1;
+  var dy = y2 - y1;
+  var mag = Math.sqrt(dx*dx + dy*dy);
+  dx /= mag; dy /= mag;
+  this.to.x = x1 + dx * this.length;
+  this.to.y = y1 + dy * this.length;
 };
 
+},{}],3:[function(require,module,exports){
+require('./arrow');
+
+var ArrowModel = require('./data/arrowModel');
+
 var eventify = require('ngraph.events');
-eventify(dataContext);
+var dataContext = {
+  arrows : createArrows(1000)
+};
 
 var vivasvg = require('../../');
 vivasvg.bootstrap(document.getElementById('scene'), dataContext);
+var mousePos = {x : 42, y: 42};
+
+window.onmousemove = function (e) {
+  e = e || window.event;
+  mousePos.x = e.clientX;
+  mousePos.y = e.clientY;
+};
 
 renderFrame();
 
 function renderFrame() {
   requestAnimationFrame(renderFrame);
-
-  var timer = Date.now() * 0.002;
-  dataContext.from.x = 100 + Math.cos(timer) * 100;
-  dataContext.from.y = 100 + Math.sin(timer) * 100;
-  dataContext.fire('from');
+  var arrows = dataContext.arrows;
+  for (var i = 0; i < arrows.length; ++i) {
+    arrows[i].move(mousePos);
+    arrows[i].fire('from');
+  }
 }
 
+function createArrows(n) {
+  var arrows = [];
+  for (var i = 0; i < n; ++i) {
+    var arrow = new ArrowModel();
+    eventify(arrow);
+    arrows.push(arrow);
+  }
+  return arrows;
+}
 
-},{"../../":3,"./arrow":1,"ngraph.events":15}],3:[function(require,module,exports){
+},{"../../":4,"./arrow":1,"./data/arrowModel":2,"ngraph.events":16}],4:[function(require,module,exports){
 module.exports = {
   svg: require('./lib/utils/svg'),
   bootstrap: require('./lib/bootstrap'),
@@ -106,7 +161,7 @@ function exportControl(name) {
   module.exports[name] = controls[name];
 }
 
-},{"./lib/binding/parser":5,"./lib/bootstrap":6,"./lib/controls":9,"./lib/extensions":12,"./lib/utils/svg":14}],4:[function(require,module,exports){
+},{"./lib/binding/parser":6,"./lib/bootstrap":7,"./lib/controls":10,"./lib/extensions":13,"./lib/utils/svg":15}],5:[function(require,module,exports){
 module.exports = function (element, bindingParser) {
   var binding;
   var attributes = element.attributes;
@@ -127,7 +182,7 @@ module.exports = function (element, bindingParser) {
   }
 };
 
-},{}],5:[function(require,module,exports){
+},{}],6:[function(require,module,exports){
 var BINDING_REGEX = /{{(.+?)}}/;
 var eventify = require('ngraph.events');
 
@@ -177,7 +232,7 @@ module.exports = function (model) {
   };
 };
 
-},{"ngraph.events":15}],6:[function(require,module,exports){
+},{"ngraph.events":16}],7:[function(require,module,exports){
 module.exports = function (domRoot, dataContext) {
   var markup = domRoot.innerHTML;
   while (domRoot.firstChild) {
@@ -194,7 +249,7 @@ module.exports = function (domRoot, dataContext) {
   svgDoc.render();
 };
 
-},{"./controls/contentControl":7,"./controls/document":8}],7:[function(require,module,exports){
+},{"./controls/contentControl":8,"./controls/document":9}],8:[function(require,module,exports){
 module.exports = ContentControl;
 
 var UIElement = require('./uiElement');
@@ -212,11 +267,12 @@ ContentControl.prototype = Object.create(UIElement.prototype);
 ContentControl.prototype.constructor = ContentControl;
 
 ContentControl.prototype._appendToDom = function (parentDom) {
-  this._dom = compileMarkup(this._markup, this._dataContext, this);
-  parentDom.appendChild(this._dom);
+  compileMarkup(this, parentDom);
 };
 
-function compileMarkup(nodes, model, logicalParent) {
+function compileMarkup(contentControl, parentDom) {
+  var nodes = contentControl._markup;
+  var model = contentControl._dataContext;
   if (typeof nodes === 'string') {
     nodes = require('../utils/domParser')(nodes);
   }
@@ -226,10 +282,13 @@ function compileMarkup(nodes, model, logicalParent) {
 
   // TODO: group is not always required. E.g. when nodes length === 1, the node
   // itself should be returned
-  var g = require('../utils/svg')('g');
-  compileSubtree(nodes, g);
-
-  return g;
+  if (nodes.length === 1) {
+    compileNode(nodes[0], parentDom);
+  } else {
+    var g = require('../utils/svg')('g');
+    compileSubtree(nodes, g);
+    parentDom.appendChild(g);
+  }
 
   function compileSubtree(nodes, visualParent) {
     for (var i = 0; i < nodes.length; ++i) {
@@ -243,7 +302,8 @@ function compileMarkup(nodes, model, logicalParent) {
       var Ctor = extensions[nodePrototype.localName];
       var child = new Ctor();
       child.markup(nodePrototype);
-      logicalParent.appendChild(child, visualParent);
+      contentControl.appendChild(child, visualParent);
+      return child._dom;
     } else {
       // regular svg, just add it to visual parent
       var node = nodePrototype.cloneNode(false);
@@ -254,11 +314,13 @@ function compileMarkup(nodes, model, logicalParent) {
       if (children && children.length > 0) {
         compileSubtree(children, node);
       }
+
+      return visualParent;
     }
   }
 }
 
-},{"../binding/element":4,"../binding/parser":5,"../extensions":12,"../utils/domParser":13,"../utils/svg":14,"./uiElement":11}],8:[function(require,module,exports){
+},{"../binding/element":5,"../binding/parser":6,"../extensions":13,"../utils/domParser":14,"../utils/svg":15,"./uiElement":12}],9:[function(require,module,exports){
 module.exports = Document;
 
 var UIElement = require('./uiElement');
@@ -304,7 +366,7 @@ function getDefsElement(svgRoot) {
   return defs;
 }
 
-},{"../utils/domParser":13,"../utils/svg":14,"./uiElement":11}],9:[function(require,module,exports){
+},{"../utils/domParser":14,"../utils/svg":15,"./uiElement":12}],10:[function(require,module,exports){
 module.exports = {
   Document: require('./document'),
   ItemsControl: require('./itemsControl'),
@@ -312,7 +374,7 @@ module.exports = {
   UIElement: require('./uiElement')
 };
 
-},{"./contentControl":7,"./document":8,"./itemsControl":10,"./uiElement":11}],10:[function(require,module,exports){
+},{"./contentControl":8,"./document":9,"./itemsControl":11,"./uiElement":12}],11:[function(require,module,exports){
 module.exports = ItemsControl;
 
 var UIElement = require('./uiElement');
@@ -377,7 +439,7 @@ function ensureCanAppendChildren(itemsControl) {
   }
 }
 
-},{"../binding/parser":5,"../utils/domParser":13,"../utils/svg":14,"./contentControl":7,"./uiElement":11}],11:[function(require,module,exports){
+},{"../binding/parser":6,"../utils/domParser":14,"../utils/svg":15,"./contentControl":8,"./uiElement":12}],12:[function(require,module,exports){
 module.exports = UIElement;
 
 function UIElement() {
@@ -436,7 +498,7 @@ function renderChild(child) {
   child.render();
 }
 
-},{}],12:[function(require,module,exports){
+},{}],13:[function(require,module,exports){
 // I'm asking for troubles by exposing this, I know. Most likely will be changed
 var registeredExtensions = {
   'items': require('./controls/itemsControl')
@@ -446,7 +508,7 @@ module.exports = function () {
   return registeredExtensions;
 };
 
-},{"./controls/itemsControl":10}],13:[function(require,module,exports){
+},{"./controls/itemsControl":11}],14:[function(require,module,exports){
 var parser = new DOMParser();
 
 module.exports = function (template) {
@@ -454,14 +516,14 @@ module.exports = function (template) {
   return parser.parseFromString('<g xmlns="http://www.w3.org/2000/svg">' + template + '</g>', 'text/xml').children[0].children;
 };
 
-},{}],14:[function(require,module,exports){
+},{}],15:[function(require,module,exports){
 var svgns = 'http://www.w3.org/2000/svg';
 
 module.exports = function (elementName) {
   return document.createElementNS(svgns, elementName);
 };
 
-},{}],15:[function(require,module,exports){
+},{}],16:[function(require,module,exports){
 module.exports = function(subject) {
   validateSubject(subject);
 
@@ -548,5 +610,5 @@ function validateSubject(subject) {
   }
 }
 
-},{}]},{},[2])
+},{}]},{},[3])
 ;

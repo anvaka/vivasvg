@@ -1,13 +1,9 @@
 require('./arrow');
 
+var mousePose = require('./data/mousePos');
 var dataContext = {
-  from : {x: 10, y: 10},
-  to: {x: 100, y: 100},
-  color: 'deepskyblue'
+  arrows : createArrows(1000)
 };
-
-var eventify = require('ngraph.events');
-eventify(dataContext);
 
 var vivasvg = require('../../');
 vivasvg.bootstrap(document.getElementById('scene'), dataContext);
@@ -16,10 +12,22 @@ renderFrame();
 
 function renderFrame() {
   requestAnimationFrame(renderFrame);
-
-  var timer = Date.now() * 0.002;
-  dataContext.from.x = 100 + Math.cos(timer) * 100;
-  dataContext.from.y = 100 + Math.sin(timer) * 100;
-  dataContext.fire('from');
+  var arrows = dataContext.arrows;
+  for (var i = 0; i < arrows.length; ++i) {
+    arrows[i].move(mousePos);
+    arrows[i].fire('from');
+  }
 }
 
+function createArrows(n) {
+  var ArrowModel = require('./data/arrowModel');
+  var eventify = require('ngraph.events');
+
+  var arrows = [];
+  for (var i = 0; i < n; ++i) {
+    var arrow = new ArrowModel();
+    eventify(arrow);
+    arrows.push(arrow);
+  }
+  return arrows;
+}

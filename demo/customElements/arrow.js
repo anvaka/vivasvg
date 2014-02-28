@@ -33,6 +33,7 @@ function compileMarkup(markup, model, arrow) {
 
   var from = bindingParser.parse(markup.getAttributeNS(null, 'from'));
   var to = bindingParser.parse(markup.getAttributeNS(null, 'to'));
+  var fromSeg, toSeg;
   if (from && to) {
     var source = from.provide();
     var dest = to.provide();
@@ -40,14 +41,20 @@ function compileMarkup(markup, model, arrow) {
     from.on('changed', function () { renderPath(from.provide(), to.provide()); });
     to.on('changed', function () { renderPath(from.provide(), to.provide()); });
 
-    renderPath(source, dest);
+    fromSeg = path.createSVGPathSegMovetoAbs(source.x, source.y);
+    toSeg = path.createSVGPathSegLinetoAbs(dest.x, dest.y);
+    path.pathSegList.appendItem(fromSeg);
+    path.pathSegList.appendItem(toSeg);
   }
   path.setAttributeNS(null, 'marker-end', 'url(#ArrowTriangle)');
 
   return path;
 
   function renderPath(source, dest) {
-    path.setAttributeNS(null, 'd', 'M' + source.x +',' + source.y + 'L' + dest.x + ',' + dest.y);
+    fromSeg.x = source.x;
+    fromSeg.y = source.y;
+    toSeg.x = dest.x;
+    toSeg.y = dest.y;
   }
 }
 
