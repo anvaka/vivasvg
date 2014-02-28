@@ -24,7 +24,13 @@ vivasvg.bootstrap(document.getElementById('scene'), {
 modifyCollection();
 
 function modifyCollection() {
-  observableCollection.push(createRandomPoint());
+  var shouldAdd = Math.random() >= 0.45;
+  if (shouldAdd) {
+    observableCollection.push(createRandomPoint());
+  } else if (observableCollection.length){
+    var removeIdx = Math.round(Math.random() * observableCollection.length - 1);
+    observableCollection.splice(removeIdx, 1);
+  }
   setTimeout(modifyCollection, Math.random() * 1000);
 }
 
@@ -57,12 +63,19 @@ var eventify = require('ngraph.events');
 function Collection() {
   var source = [];
   var api = {
+    length: 0,
+
     push: function (item) {
       source.push(item);
-      api.fire('changed', {
-        action: 'add',
-        added: [item]
-      });
+      this.length += 1;
+
+      api.fire('changed', { added: [item] });
+    },
+
+    splice: function (idx, count) {
+      var removed = source.splice(idx, count);
+      this.length = source.length;
+      api.fire('changed', { removed: removed, removeIdx: idx });
     }
   };
 
@@ -188,11 +201,12 @@ function compileMarkup(contentControl, parentDom) {
 
   // Trying to avoid extra dom elements when content control only has one child
   if (nodes.length === 1) {
-    compileNode(nodes[0], parentDom);
+    contentControl._dom = compileNode(nodes[0], parentDom);
   } else {
     var g = require('../utils/svg')('g');
     compileSubtree(nodes, g);
     parentDom.appendChild(g);
+    contentControl._dom = g;
   }
 
   function compileSubtree(nodes, visualParent) {
@@ -220,7 +234,7 @@ function compileMarkup(contentControl, parentDom) {
         compileSubtree(children, node);
       }
 
-      return visualParent;
+      return node;
     }
   }
 }
@@ -323,6 +337,16 @@ ItemsControl.prototype._addItem = function (itemModel) {
   this.appendChild(contentControl);
 };
 
+ItemsControl.prototype._removeItems = function (from, count) {
+  var removed = this._children.splice(from, count);
+  var dom = this._dom;
+  if (dom) {
+    for (var i = 0; i < removed.length; ++i) {
+      dom.removeChild(removed[i]._dom);
+    }
+  }
+};
+
 function appendChildren(itemsControl) {
   ensureCanAppendChildren(itemsControl);
 
@@ -352,14 +376,17 @@ function ensureCanAppendChildren(itemsControl) {
 }
 
 function handleCollectionChanged(changeEventArgs) {
-  var action = changeEventArgs.action;
-  if (action === 'add') {
-    var addedItems = changeEventArgs.added;
-    if (addedItems) {
-      for (var i = 0; i < addedItems.length; ++i) {
-        this._addItem(addedItems[i]);
-      }
+  var i;
+  var addedItems = changeEventArgs.added;
+  if (addedItems) {
+    for (i = 0; i < addedItems.length; ++i) {
+      this._addItem(addedItems[i]);
     }
+  }
+  var removedItems = changeEventArgs.removed;
+  if (removedItems) {
+    var removeIdx = changeEventArgs.removeIdx || 0;
+    this._removeItems(removeIdx, removedItems.length);
   }
 }
 

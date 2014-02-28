@@ -9,6 +9,12 @@ vivasvg.bootstrap(document.getElementById('scene'), {
 modifyCollection();
 
 function modifyCollection() {
-  observableCollection.push(createRandomPoint());
+  var shouldAdd = Math.random() >= 0.45;
+  if (shouldAdd) {
+    observableCollection.push(createRandomPoint());
+  } else if (observableCollection.length){
+    var removeIdx = Math.round(Math.random() * observableCollection.length - 1);
+    observableCollection.splice(removeIdx, 1);
+  }
   setTimeout(modifyCollection, Math.random() * 1000);
 }
