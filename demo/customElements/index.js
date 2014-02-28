@@ -1,6 +1,6 @@
 require('./arrow');
 
-var mousePose = require('./data/mousePos');
+var mousePos = require('./data/mousePos');
 var dataContext = {
   arrows : createArrows(1000)
 };
