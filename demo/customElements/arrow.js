@@ -38,8 +38,8 @@ function compileMarkup(markup, model, arrow) {
     var source = from.provide();
     var dest = to.provide();
 
-    from.on('changed', function () { renderPath(from.provide(), to.provide()); });
-    to.on('changed', function () { renderPath(from.provide(), to.provide()); });
+    from.on('from', onPositionPropertyChanged);
+    to.on('to', onPositionPropertyChanged);
 
     fromSeg = path.createSVGPathSegMovetoAbs(source.x, source.y);
     toSeg = path.createSVGPathSegLinetoAbs(dest.x, dest.y);
@@ -49,6 +49,10 @@ function compileMarkup(markup, model, arrow) {
   path.setAttributeNS(null, 'marker-end', 'url(#ArrowTriangle)');
 
   return path;
+
+  function onPositionPropertyChanged() {
+    renderPath(from.provide(), to.provide());
+  }
 
   function renderPath(source, dest) {
     fromSeg.x = source.x;
