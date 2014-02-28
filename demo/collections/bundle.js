@@ -1,157 +1,34 @@
 ;(function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);throw new Error("Cannot find module '"+o+"'")}var f=n[o]={exports:{}};t[o][0].call(f.exports,function(e){var n=t[o][1][e];return s(n?n:e)},f,f.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+module.exports = ["#8FBC8F","#EEE8AA","#DC143C","#8A2BE2","#C0C0C0","#00008B","#DDA0DD","#008080","#FF6347","#808000","#B0E0E6","#DEB887","#2F4F4F","#FF00FF","#FFEBCD","#F5FFFA","#CD5C5C","#191970","#4682B4","#E9967A","#A0522D","#800080","#2E8B57","#40E0D0","#FFEFD5","#FF1493","#FFFF00","#8B008B","#87CEEB","#483D8B","#5F9EA0","#4B0082","#98FB98","#6B8E23","#48D1CC","#556B2F","#BA55D3","#FAFAD2","#B22222","#8B0000","#F8F8FF","#FFFFF0","#FFC0CB","#D8BFD8","#F0F8FF","#00FFFF","#F0FFF0","#FF69B4","#FFF0F5","#FAF0E6","#000000","#00BFFF","#F5DEB3","#D3D3D3","#F08080","#FFDAB9","#EE82EE","#FDF5E6","#228B22","#FF7F50","#778899","#FFF8DC","#DB7093","#FFD700","#7FFFD4","#FAEBD7","#800000","#FF4500","#D2B48C","#6495ED","#FFA500","#E0FFFF","#FFFACD","#FFE4B5","#FFA07A","#9370DB","#4169E1","#9ACD32","#FFFAF0","#F0E68C","#00FF7F","#9932CC","#8B4513","#A52A2A","#000080","#DCDCDC","#9400D3","#FFFFE0","#008000","#FFE4E1","#CD853F","#FFFFFF","#F5F5DC","#696969","#00CED1","#87CEFA","#7B68EE","#ADD8E6","#E6E6FA","#808080","#D2691E","#00FFFF","#1E90FF","#20B2AA","#DA70D6","#FFB6C1","#B0C4DE","#3CB371","#708090","#B8860B","#0000FF","#ADFF2F","#BC8F8F","#DAA520","#00FF00","#FF8C00","#0000CD","#BDB76B","#C71585","#6A5ACD","#66CDAA","#AFEEEE","#FF00FF","#90EE90","#32CD32","#008B8B","#F0FFFF","#F5F5F5","#00FA9A","#FFDEAD","#7FFF00","#A9A9A9","#FFE4C4","#FA8072","#FF0000","#F4A460","#7CFC00","#006400","#FFF5EE","#FFFAFA"];
+
+},{}],2:[function(require,module,exports){
+var colors = require('./randomColors');
+
+module.exports = function createRandomPoint() {
+  return {
+    x: Math.random() * 640,
+    y: Math.random() * 480,
+    color: colors[(Math.random() * colors.length) | 0]
+  };
+};
+
+},{"./randomColors":1}],3:[function(require,module,exports){
 var vivasvg = require('../../');
-vivasvg.registerControl('arrow', Arrow);
+var observableCollection = new vivasvg.Collection();
+var createRandomPoint = require('./data/randomPoint');
 
-var UIElement = vivasvg.UIElement;
+vivasvg.bootstrap(document.getElementById('scene'), {
+  points: observableCollection
+});
 
-function Arrow() {
-  if (!(this instanceof Arrow)){
-    return new Arrow();
-  }
+modifyCollection();
 
-  UIElement.call(this);
+function modifyCollection() {
+  observableCollection.push(createRandomPoint());
+  setTimeout(modifyCollection, Math.random() * 1000);
 }
 
-Arrow.prototype = Object.create(UIElement.prototype);
-Arrow.prototype.constructor = Arrow;
-
-Arrow.prototype._appendToDom = function (parentDom) {
-  this._dom = compileMarkup(this._markup, this._dataContext, this);
-  parentDom.appendChild(this._dom);
-};
-
-function compileMarkup(markup, model, arrow) {
-  // todo: looks like some of the code below should belong to UIElement
-  addArrowTriangle(arrow);
-  var path = vivasvg.svg('path');
-  var bindingParser = vivasvg.bindingParser(model);
-
-  var strokeValue = markup.getAttributeNS(null, 'stroke');
-  var sourceBinding = bindingParser.parse(strokeValue);
-  if (sourceBinding) {
-    path.setAttributeNS(null, 'stroke', sourceBinding.provide());
-  }
-
-  var from = bindingParser.parse(markup.getAttributeNS(null, 'from'));
-  var to = bindingParser.parse(markup.getAttributeNS(null, 'to'));
-  var fromSeg, toSeg;
-  if (from && to) {
-    var source = from.provide();
-    var dest = to.provide();
-
-    from.on('from', onPositionPropertyChanged);
-    to.on('to', onPositionPropertyChanged);
-
-    fromSeg = path.createSVGPathSegMovetoAbs(source.x, source.y);
-    toSeg = path.createSVGPathSegLinetoAbs(dest.x, dest.y);
-    path.pathSegList.appendItem(fromSeg);
-    path.pathSegList.appendItem(toSeg);
-  }
-  path.setAttributeNS(null, 'marker-end', 'url(#ArrowTriangle)');
-
-  return path;
-
-  function onPositionPropertyChanged() {
-    renderPath(from.provide(), to.provide());
-  }
-
-  function renderPath(source, dest) {
-    fromSeg.x = source.x;
-    fromSeg.y = source.y;
-    toSeg.x = dest.x;
-    toSeg.y = dest.y;
-  }
-}
-
-function addArrowTriangle(arrow) {
-  var ownerDocument = arrow.getOwnerDocument(arrow);
-  if (ownerDocument && !ownerDocument.ArrowAugmented) {
-    ownerDocument.addDef('<marker id="ArrowTriangle" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="strokeWidth" markerWidth="10" markerHeight="5" orient="auto" style="fill: deepskyblue"><path d="M 0 0 L 10 5 L 0 10 z"></path></marker>');
-    ownerDocument.ArrowAugmented = true; // todo: should be better way
-  }
-}
-
-},{"../../":5}],2:[function(require,module,exports){
-module.exports = ArrowModel;
-
-function ArrowModel() {
-  this.from = {x: Math.random() * 640, y: Math.random() * 480};
-  this.to = {x: Math.random() * 640, y: Math.random() * 480};
-  this.color = 'deepskyblue';
-  this.vx = -3 + Math.random() * 6;
-  this.vy = -3 + Math.random() * 6;
-  this.length = 10 + Math.random() * 10;
-}
-
-ArrowModel.prototype.move = function (target) {
-  var x = this.from.x + this.vx;
-  var y = this.from.y + this.vy;
-  if (x < 0 || x > 640)  {
-    this.vx *= -1;
-    x = this.from.x + this.vx;
-  }
-  if (y < 0 || y > 480)  {
-    this.vy *= -1;
-    y = this.from.y + this.vy;
-  }
-  this.from.x = x;
-  this.from.y = y;
-  var x2 = target.x, y2 = target.y, x1 = this.from.x, y1 = this.from.y;
-  var dx = x2 - x1;
-  var dy = y2 - y1;
-  var mag = Math.sqrt(dx*dx + dy*dy);
-  dx /= mag; dy /= mag;
-  this.to.x = x1 + dx * this.length;
-  this.to.y = y1 + dy * this.length;
-};
-
-},{}],3:[function(require,module,exports){
-var mousePos = {x : 42, y: 42};
-
-window.onmousemove = function (e) {
-  e = e || window.event;
-  mousePos.x = e.clientX;
-  mousePos.y = e.clientY;
-};
-
-module.exports = mousePos;
-
-},{}],4:[function(require,module,exports){
-require('./arrow');
-
-var mousePos = require('./data/mousePos');
-var dataContext = {
-  arrows : createArrows(1000)
-};
-
-var vivasvg = require('../../');
-vivasvg.bootstrap(document.getElementById('scene'), dataContext);
-
-renderFrame();
-
-function renderFrame() {
-  requestAnimationFrame(renderFrame);
-  var arrows = dataContext.arrows;
-  for (var i = 0; i < arrows.length; ++i) {
-    arrows[i].move(mousePos);
-    arrows[i].fire('from');
-  }
-}
-
-function createArrows(n) {
-  var ArrowModel = require('./data/arrowModel');
-  var eventify = require('ngraph.events');
-
-  var arrows = [];
-  for (var i = 0; i < n; ++i) {
-    var arrow = new ArrowModel();
-    eventify(arrow);
-    arrows.push(arrow);
-  }
-  return arrows;
-}
-
-},{"../../":5,"./arrow":1,"./data/arrowModel":2,"./data/mousePos":3,"ngraph.events":18}],5:[function(require,module,exports){
+},{"../../":4,"./data/randomPoint":2}],4:[function(require,module,exports){
 module.exports = {
   Collection: require('./lib/binding/collection'),
   svg: require('./lib/utils/svg'),
@@ -171,18 +48,30 @@ function exportControl(name) {
   module.exports[name] = controls[name];
 }
 
-},{"./lib/binding/collection":6,"./lib/binding/parser":8,"./lib/bootstrap":9,"./lib/controls":12,"./lib/extensions":15,"./lib/utils/svg":17}],6:[function(require,module,exports){
+},{"./lib/binding/collection":5,"./lib/binding/parser":7,"./lib/bootstrap":8,"./lib/controls":11,"./lib/extensions":14,"./lib/utils/svg":16}],5:[function(require,module,exports){
 module.exports = Collection;
 
-function Collection() {
-  return {
-    push: function () {
+var eventify = require('ngraph.events');
 
+// todo: optimize by GC
+function Collection() {
+  var source = [];
+  var api = {
+    push: function (item) {
+      source.push(item);
+      api.fire('changed', {
+        action: 'add',
+        added: [item]
+      });
     }
   };
+
+  eventify(api);
+
+  return api;
 }
 
-},{}],7:[function(require,module,exports){
+},{"ngraph.events":17}],6:[function(require,module,exports){
 module.exports = function (element, bindingParser) {
   var binding;
   var attributes = element.attributes;
@@ -203,7 +92,7 @@ module.exports = function (element, bindingParser) {
   }
 };
 
-},{}],8:[function(require,module,exports){
+},{}],7:[function(require,module,exports){
 var BINDING_REGEX = /{{(.+?)}}/;
 var eventify = require('ngraph.events');
 
@@ -249,7 +138,7 @@ module.exports = function (model) {
   };
 };
 
-},{"ngraph.events":18}],9:[function(require,module,exports){
+},{"ngraph.events":17}],8:[function(require,module,exports){
 module.exports = function (domRoot, dataContext) {
   var markup = domRoot.innerHTML;
   while (domRoot.firstChild) {
@@ -266,7 +155,7 @@ module.exports = function (domRoot, dataContext) {
   return svgDoc;
 };
 
-},{"./controls/contentControl":10,"./controls/document":11}],10:[function(require,module,exports){
+},{"./controls/contentControl":9,"./controls/document":10}],9:[function(require,module,exports){
 module.exports = ContentControl;
 
 var UIElement = require('./uiElement');
@@ -336,7 +225,7 @@ function compileMarkup(contentControl, parentDom) {
   }
 }
 
-},{"../binding/element":7,"../binding/parser":8,"../extensions":15,"../utils/domParser":16,"../utils/svg":17,"./uiElement":14}],11:[function(require,module,exports){
+},{"../binding/element":6,"../binding/parser":7,"../extensions":14,"../utils/domParser":15,"../utils/svg":16,"./uiElement":13}],10:[function(require,module,exports){
 module.exports = Document;
 
 var UIElement = require('./uiElement');
@@ -382,7 +271,7 @@ function getDefsElement(svgRoot) {
   return defs;
 }
 
-},{"../utils/domParser":16,"../utils/svg":17,"./uiElement":14}],12:[function(require,module,exports){
+},{"../utils/domParser":15,"../utils/svg":16,"./uiElement":13}],11:[function(require,module,exports){
 module.exports = {
   Document: require('./document'),
   ItemsControl: require('./itemsControl'),
@@ -390,9 +279,10 @@ module.exports = {
   UIElement: require('./uiElement')
 };
 
-},{"./contentControl":10,"./document":11,"./itemsControl":13,"./uiElement":14}],13:[function(require,module,exports){
+},{"./contentControl":9,"./document":10,"./itemsControl":12,"./uiElement":13}],12:[function(require,module,exports){
 module.exports = ItemsControl;
 
+var ContentControl = require('./contentControl');
 var UIElement = require('./uiElement');
 
 function ItemsControl() {
@@ -408,10 +298,15 @@ ItemsControl.prototype.constructor = ItemsControl;
 
 ItemsControl.prototype.setItemTemplate = function (itemTemplate) {
   this._itemTemplate = itemTemplate;
+  this._nodePrototype = require('../utils/domParser')(itemTemplate);
 };
 
 ItemsControl.prototype.setItemSource = function (itemSource) {
+  // todo: what should we do when item source is already set?
   this._itemSource = itemSource;
+  if (itemSource && typeof itemSource.on === 'function') {
+    itemSource.on('changed',  handleCollectionChanged.bind(this));
+  }
 };
 
 ItemsControl.prototype._appendToDom = function (parentDom) {
@@ -420,19 +315,20 @@ ItemsControl.prototype._appendToDom = function (parentDom) {
   parentDom.appendChild(this._dom);
 };
 
+ItemsControl.prototype._addItem = function (itemModel) {
+  var contentControl = new ContentControl();
+  // override default data context to current item:
+  contentControl.dataContext(itemModel);
+  contentControl.markup(this._nodePrototype);
+  this.appendChild(contentControl);
+};
+
 function appendChildren(itemsControl) {
   ensureCanAppendChildren(itemsControl);
 
-  var ContentControl = require('./contentControl');
-  var nodePrototype = require('../utils/domParser')(itemsControl._itemTemplate);
-
   var itemSource = itemsControl._itemSource;
   for (var i = 0; i < itemSource.length; ++i) {
-    var contentControl = new ContentControl();
-    // override default data context to current item:
-    contentControl.dataContext(itemSource[i]);
-    contentControl.markup(nodePrototype);
-    itemsControl.appendChild(contentControl);
+    itemsControl._addItem(itemSource[i]);
   }
 }
 
@@ -455,7 +351,19 @@ function ensureCanAppendChildren(itemsControl) {
   }
 }
 
-},{"../binding/parser":8,"../utils/domParser":16,"../utils/svg":17,"./contentControl":10,"./uiElement":14}],14:[function(require,module,exports){
+function handleCollectionChanged(changeEventArgs) {
+  var action = changeEventArgs.action;
+  if (action === 'add') {
+    var addedItems = changeEventArgs.added;
+    if (addedItems) {
+      for (var i = 0; i < addedItems.length; ++i) {
+        this._addItem(addedItems[i]);
+      }
+    }
+  }
+}
+
+},{"../binding/parser":7,"../utils/domParser":15,"../utils/svg":16,"./contentControl":9,"./uiElement":13}],13:[function(require,module,exports){
 module.exports = UIElement;
 
 function UIElement() {
@@ -514,7 +422,7 @@ function renderChild(child) {
   child.render();
 }
 
-},{}],15:[function(require,module,exports){
+},{}],14:[function(require,module,exports){
 // I'm asking for troubles by exposing this, I know. Most likely will be changed
 var registeredExtensions = {
   'items': require('./controls/itemsControl')
@@ -524,7 +432,7 @@ module.exports = function () {
   return registeredExtensions;
 };
 
-},{"./controls/itemsControl":13}],16:[function(require,module,exports){
+},{"./controls/itemsControl":12}],15:[function(require,module,exports){
 var parser = new DOMParser();
 
 module.exports = function (template) {
@@ -532,14 +440,14 @@ module.exports = function (template) {
   return parser.parseFromString('<g xmlns="http://www.w3.org/2000/svg">' + template + '</g>', 'text/xml').children[0].children;
 };
 
-},{}],17:[function(require,module,exports){
+},{}],16:[function(require,module,exports){
 var svgns = 'http://www.w3.org/2000/svg';
 
 module.exports = function (elementName) {
   return document.createElementNS(svgns, elementName);
 };
 
-},{}],18:[function(require,module,exports){
+},{}],17:[function(require,module,exports){
 module.exports = function(subject) {
   validateSubject(subject);
 
@@ -629,5 +537,5 @@ function validateSubject(subject) {
   }
 }
 
-},{}]},{},[4])
+},{}]},{},[3])
 ;
