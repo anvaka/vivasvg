@@ -1,28 +1,17 @@
 var vivasvg = require('../../');
-vivasvg.registerControl('arrow', Arrow);
 
-var UIElement = vivasvg.UIElement;
-
-function Arrow() {
-  if (!(this instanceof Arrow)){
-    return new Arrow();
+vivasvg.createTag('arrow', {
+  _appendToDom: function (parentDom) {
+    this._dom = compileMarkup(this._markup, this._dataContext, this);
+    parentDom.appendChild(this._dom);
   }
-
-  UIElement.call(this);
-}
-
-Arrow.prototype = Object.create(UIElement.prototype);
-Arrow.prototype.constructor = Arrow;
-
-Arrow.prototype._appendToDom = function (parentDom) {
-  this._dom = compileMarkup(this._markup, this._dataContext, this);
-  parentDom.appendChild(this._dom);
-};
+});
 
 function compileMarkup(markup, model, arrow) {
   // todo: looks like some of the code below should belong to UIElement
   addArrowTriangle(arrow);
-  var path = vivasvg.svg('path');
+
+  var path = arrow.createElement('path');
   var bindingParser = vivasvg.bindingParser(model);
 
   var strokeValue = markup.getAttributeNS(null, 'stroke');
@@ -46,6 +35,7 @@ function compileMarkup(markup, model, arrow) {
     path.pathSegList.appendItem(fromSeg);
     path.pathSegList.appendItem(toSeg);
   }
+
   path.setAttributeNS(null, 'marker-end', 'url(#ArrowTriangle)');
 
   return path;
