@@ -1,5 +1,6 @@
 module.exports = {
   Collection: require('./lib/binding/collection'),
+  model: require('./lib/binding/model'),
   svg: require('./lib/utils/svg'),
   bootstrap: require('./lib/bootstrap'),
   bindingParser: require('./lib/binding/parser'),
