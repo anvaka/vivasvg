@@ -1,16 +1,16 @@
 module.exports = {
+  // data binding related
   collection: require('./lib/binding/collection'),
   model: require('./lib/binding/model'),
-  svg: require('./lib/utils/svg'),
-  bootstrap: require('./lib/bootstrap'),
   bindingParser: require('./lib/binding/parser'),
-  registerControl: function (name, ctor) {
-    // todo: name collisions?
-    var extensions = require('./lib/extensions')();
-    extensions[name] = ctor;
-  }
+
+  bootstrap: require('./lib/bootstrap'),
+  createTag: require('./lib/utils/createTag'),
+
+  svg: require('./lib/utils/svg')
 };
 
+// augment with base controls
 var controls = require('./lib/controls');
 Object.keys(controls).forEach(exportControl);
 
