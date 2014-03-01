@@ -1,5 +1,5 @@
 var vivasvg = require('../../');
-var observableCollection = new vivasvg.Collection();
+var observableCollection = new vivasvg.collection();
 var createRandomPoint = require('./data/randomPoint');
 
 vivasvg.bootstrap(document.getElementById('scene'), {
