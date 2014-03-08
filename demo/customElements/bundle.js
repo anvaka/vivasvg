@@ -230,6 +230,8 @@ module.exports = function (element, bindingParser) {
       element.nodeValue = binding.provide();
     }
   }
+
+  return binding;
 };
 
 function onAttributeChanged(element, attr, binding) {
@@ -251,10 +253,14 @@ var eventify = require('ngraph.events');
 
 module.exports = function (model) {
   var modelIsActive = typeof model.on === 'function';
-  var on = modelIsActive ?
-        function (eventName, cb) {
-          model.on(eventName, cb);
-        } : function () {};
+  var on, off;
+  if (modelIsActive) {
+    on = model.on;
+    off = model.off;
+  } else {
+    on = off = function () {};
+  }
+
   return {
     parse: function (expression) {
       var match = BINDING_REGEX.exec(expression);
@@ -318,8 +324,9 @@ module.exports = function (model) {
 
       var api = {
         provide: provider,
+        activeProperties: activeProperties,
         on: on,
-        activeProperties: activeProperties
+        off: off
       };
 
       return api;
@@ -391,7 +398,10 @@ function compileMarkup(contentControl, parentDom) {
     } else {
       // regular svg, just add it to visual parent
       var node = nodePrototype.cloneNode(false);
-      bindElement(node, bindingParser);
+      var binding = bindElement(node, bindingParser);
+      if (binding) {
+        contentControl._registerBinding(binding);
+      }
 
       visualParent.appendChild(node);
       var children = nodePrototype.childNodes;
@@ -441,7 +451,7 @@ Document.prototype.addDef = function (defsMarkup) {
 
 function getDefsElement(svgRoot) {
   var children = svgRoot.childNodes;
-  for (var i = 0; children.length; ++i) {
+  for (var i = 0; i < children.length; ++i) {
     if (children[i].localName === 'defs') return children[i];
   }
 
@@ -498,6 +508,7 @@ module.exports = createTag('items', {
     if (dom) {
       for (var i = 0; i < removed.length; ++i) {
         dom.removeChild(removed[i]._dom);
+        removed[i]._dispose();
       }
     }
   }
@@ -568,6 +579,20 @@ UIElement.prototype.appendChild = function (child, visualParent) {
   child._appendToDom(visualParent || this._dom);
 };
 
+UIElement.prototype.removeChild = function (child) {
+  if (this._children) {
+    // whelps O(n). TODO: Need to be faster!
+    var idx = this._children.indexOf(child);
+    if (idx >= 0) {
+      this._children.splice(idx, 1);
+    }
+  }
+  child._dispose();
+  if (child._dom && this._dom) {
+    this._dom.removeChild(child._dom);
+  }
+};
+
 UIElement.prototype.dataContext = function (context) {
   this._dataContext = context;
 };
@@ -596,6 +621,19 @@ UIElement.prototype._appendToDom = function (dom) {
   }
 };
 
+UIElement.prototype._dispose = function () {
+  // we need to let each child deallocate resource
+  // todo: bindings tracking/registration should not happen here
+  if (this._bindings) { this._bindings.forEach(disposeBinding); }
+  if (this._children) {
+    this._children.forEach(disposeChild);
+  }
+};
+
+UIElement.prototype._registerBinding = function (binding) {
+  (this._bindings || (this._bindings = [])).push(binding);
+};
+
 UIElement.prototype._inheritDataContext = function () {
   if (!this._dataContext && this._parent) {
     // is this good enough, or there is a better way?
@@ -605,6 +643,14 @@ UIElement.prototype._inheritDataContext = function () {
 
 function renderChild(child) {
   child.render();
+}
+
+function disposeChild(child) {
+  child._dispose();
+}
+
+function disposeBinding(binding) {
+  binding.off(); // todo: this is not right, since it will kill all notifications
 }
 
 },{}],16:[function(require,module,exports){
