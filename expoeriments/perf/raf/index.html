@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <title>Request Animation Frame</title>
+  </head>
+  <body>
+    <script src='../animate.js' type="text/javascript" charset="utf-8">
+    </script>
+    <script type="text/javascript" charset="utf-8">
+      var items = createItems(window.location.search.substring(1));
+      animate();
+      function animate() {
+        requestAnimationFrame(animate);
+        animateItems(items);
+      }
+    </script>
+  </body>
+</html>
