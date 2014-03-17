@@ -3,26 +3,67 @@
  */
 module.exports.makeBinding = makeBinding;
 module.exports.model = model;
-module.exports.Document = Document;
-module.exports.ContentControl = ContentControl;
+module.exports.bindingGroup = bindingGroup;
 
-function ContentControl() {
-
-}
-
-function Document(parent) {
-  // todo: implement me
-}
-
+var eventify = require('ngraph.events');
 function model(rawObject) {
-  // todo: wrap rawObejct into "active" event emitter
+  eventify(rawObject);
+  return rawObject;
+}
+
+function bindingGroup() {
+  var dirtyBindings = [];
+  var dirtyLength = 0;
+
+  return {
+    run: run,
+    bind: bind
+  };
+
+  function run() {
+    requestAnimationFrame(run);
+    if (dirtyLength) {
+      updateTargets();
+    }
+  }
+
+  function bind(target, source) {
+    var cx = registeredBindings.circle.cx;
+    var bindingX = {
+      set: registeredBindings.circle.cx,
+      target: target,
+      source: function () { return source.x; }
+    };
+    source.on('x', function () {
+      dirtyBindings[dirtyLength++] = bindingX;
+    });
+
+    var cy = registeredBindings.circle.cy;
+    var bindingY = {
+      set: registeredBindings.circle.cy,
+      target: target,
+      source: function () { return source.y; }
+    };
+
+    source.on('y', function () {
+      dirtyBindings[dirtyLength++] = bindingY;
+    });
+  }
+
+  function updateTargets() {
+    for (var i = 0; i < dirtyLength; ++i) {
+      var binding = dirtyBindings[i];
+      binding.set(binding.target, binding.source());
+    }
+    dirtyLength = 0;
+  }
 }
 
 var registeredBindings = Object.create(null);
 function makeBinding(elementName, attrName, cb) {
   var elementBindings = registeredBindings[elementName];
   if (!elementBindings) {
-    registeredBindings[elementName] = Object.create(null);
+    elementBindings = registeredBindings[elementName] = Object.create(null);
   }
   var attrBindings = elementBindings[attrName];
   if (!attrBindings) {

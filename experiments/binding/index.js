@@ -1,24 +1,52 @@
 var vivasvg = require('./vivasvg');
+// register 'standard' rules for binding:
+vivasvg.makeBinding('circle', 'cx', function (ui, newValue) {
+  ui.cx.baseVal.value = newValue;
+});
 
-var model = vivasvg.model({ x: 42, y: 42, dx: 1, dy: 1 });
+vivasvg.makeBinding('circle', 'cy', function (ui, newValue) {
+  ui.cy.baseVal.value = newValue;
+});
 
-var svgDocument = vivasvg.Document(document.body);
-svgDocument.dataContext(model);
+var bindingGroup = vivasvg.bindingGroup();
+var models = createModels(8000);
+var scene = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+document.body.appendChild(scene);
 
-var contentControl = vivasvg.ContentControl();
-contentControl.markup('<circle cx="{{x}}" cy="{{y}}" r="1"></circle>');
+for (var i = 0; i < models.length; ++i) {
+  var circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  circle.setAttributeNS(null, 's-cx', '{{x}}');
+  circle.setAttributeNS(null, 's-cy', '{{y}}');
+  circle.setAttributeNS(null, 'r', '1');
+  bindingGroup.bind(circle, models[i]);
 
-svgDocument.appendChild(contentControl);
-svgDocument.run();
+  scene.appendChild(circle);
+}
 
 // Start animation loop (yes, outside of RAF, this is totally OK):
 setInterval(function () {
-  model.x += dx; if (model.x < 0 || model.x > 640 ) { model.dx *= -1; model.x += dx; }
-  model.y += dy; if (model.y < 0 || model.y > 640 ) { model.dy *= -1; model.y += dy; }
-  model.notify(); 
-  // notify() will mark all bindings which are using this model as `dirty`
+  for (var i = 0; i < models.length; ++i) {
+    model = models[i];
+    model.x += model.dx; if (model.x < 0 || model.x > 640 ) { model.dx *= -1; model.x += model.dx; }
+    model.y += model.dy; if (model.y < 0 || model.y > 640 ) { model.dy *= -1; model.y += model.dy; }
+    model.fire('x');
+    model.fire('y');
+  }
+  // fire() will mark all bindings which are using this model as `dirty`
   // and eventually, during RAF loop, will result in UI update
-  // Note: Unlike angular, notify needs to be explicit. We are focused on
+  // Note: Unlike angular, this needs to be explicit. We are focused on
   // performance here and cannot afford diff algorithm within 16ms. Also unlike
-  // angular use case with 4k dom elements is absolutely valid
+  // angular, use case with 4k dom elements is absolutely valid
 });
+
+bindingGroup.run();
+
+function createModels(count) {
+  var models = [];
+  for (var i = 0; i < count; ++i) {
+    models.push(
+      vivasvg.model({ x: Math.random() * 640, y: Math.random() * 480, dx: Math.random() * 10 - 5 , dy: Math.random() * 10 - 5 })
+    );
+  }
+  return models;
+}
