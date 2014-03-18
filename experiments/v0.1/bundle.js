@@ -22,7 +22,7 @@ setInterval(function () {
     model = models[i];
     model.x += model.dx; if (model.x < 0 || model.x > 640 ) { model.dx *= -1; model.x += model.dx; }
     model.y += model.dy; if (model.y < 0 || model.y > 480 ) { model.dy *= -1; model.y += model.dy; }
-    model.fire('x'); model.fire('y');
+    model.invalidate('x', 'y');
   }
   // fire() will mark all bindings which are using this model as `dirty`
   // and eventually, during RAF loop, will result in UI update
@@ -107,8 +107,8 @@ function bindingGroup() {
       source: undefined
     };
 
-    model.on(propertyName, function () {
-      binding.source = model[propertyName]; // todo: what if property has nested call? foo.x?
+    model.bind(propertyName, function (value) {
+      binding.source = value; // todo: what if property has nested call? foo.x?
 
       if (binding.isDirty) return; // already in the queue.
       binding.isDirty = true;
@@ -167,14 +167,31 @@ function getTagRules(tagName) {
 },{}],4:[function(require,module,exports){
 module.exports = model;
 
-var eventify = require('ngraph.events');
 function model(rawObject) {
-  eventify(rawObject);
+  var boundProperties = Object.create(null);
+  rawObject.bind = function (propertyName, changed) {
+    var callbacks = boundProperties[propertyName];
+    if (!callbacks) {
+      callbacks = boundProperties[propertyName] = [];
+    }
+    callbacks.push(changed);
+  };
+
+  rawObject.invalidate = function () {
+    for (var i = 0; i < arguments.length; ++i) {
+      var propertyName = arguments[i];
+      var callbacks = boundProperties[propertyName];
+      for (var j = 0; j < callbacks.length; ++j) {
+        callbacks[j](rawObject[propertyName]);
+      }
+    }
+  };
+
   return rawObject;
 }
 
 
-},{"ngraph.events":7}],5:[function(require,module,exports){
+},{}],5:[function(require,module,exports){
 /**
  * This file contains optimized target setters for standard svg properties.
  *
@@ -219,95 +236,5 @@ module.exports.model = require('./lib/binding/model');
 // todo: do we need to expose this?
 module.exports.bindingGroup = require('./lib/binding/bindingGroup');
 
-},{"./lib/binding/bindingGroup":2,"./lib/binding/bindingRule":3,"./lib/binding/model":4,"./lib/binding/standardBindings":5}],7:[function(require,module,exports){
-module.exports = function(subject) {
-  validateSubject(subject);
-
-  var eventsStorage = createEventsStorage(subject);
-  subject.on = eventsStorage.on;
-  subject.off = eventsStorage.off;
-  subject.fire = eventsStorage.fire;
-  return subject;
-};
-
-function createEventsStorage(subject) {
-  // Store all event listeners to this hash. Key is event name, value is array
-  // of callback records.
-  //
-  // A callback record consists of callback function and its optional context:
-  // { 'eventName' => [{callback: function, ctx: object}] }
-  var registeredEvents = Object.create(null);
-
-  return {
-    on: function (eventName, callback, ctx) {
-      if (typeof callback !== 'function') {
-        throw new Error('callback is expected to be a function');
-      }
-      var handlers = registeredEvents[eventName];
-      if (!handlers) {
-        handlers = registeredEvents[eventName] = [];
-      }
-      handlers.push({callback: callback, ctx: ctx});
-
-      return subject;
-    },
-
-    off: function (eventName, callback) {
-      var wantToRemoveAll = (typeof eventName === 'undefined');
-      if (wantToRemoveAll) {
-        // Killing old events storage should be enough in this case:
-        registeredEvents = Object.create(null);
-        return subject;
-      }
-
-      if (registeredEvents[eventName]) {
-        var deleteAllCallbacksForEvent = (typeof callback !== 'function');
-        if (deleteAllCallbacksForEvent) {
-          delete registeredEvents[eventName];
-        } else {
-          var callbacks = registeredEvents[eventName];
-          for (var i = 0; i < callbacks.length; ++i) {
-            if (callbacks[i].callback === callback) {
-              callbacks.splice(i, 1);
-            }
-          }
-        }
-      }
-
-      return subject;
-    },
-
-    fire: function (eventName) {
-      var callbacks = registeredEvents[eventName];
-      if (!callbacks) {
-        return subject;
-      }
-
-      var fireArguments;
-      if (arguments.length > 1) {
-        fireArguments = Array.prototype.splice.call(arguments, 1);
-      }
-      for(var i = 0; i < callbacks.length; ++i) {
-        var callbackInfo = callbacks[i];
-        callbackInfo.callback.apply(callbackInfo.ctx, fireArguments);
-      }
-
-      return subject;
-    }
-  };
-}
-
-function validateSubject(subject) {
-  if (!subject) {
-    throw new Error('Eventify cannot use falsy object as events subject');
-  }
-  var reservedWords = ['on', 'fire', 'off'];
-  for (var i = 0; i < reservedWords.length; ++i) {
-    if (subject.hasOwnProperty(reservedWords[i])) {
-      throw new Error("Subject cannot be eventified, since it already has property '" + reservedWords[i] + "'");
-    }
-  }
-}
-
-},{}]},{},[1])
+},{"./lib/binding/bindingGroup":2,"./lib/binding/bindingRule":3,"./lib/binding/model":4,"./lib/binding/standardBindings":5}]},{},[1])
 ;

@@ -54,8 +54,8 @@ function bindingGroup() {
       source: undefined
     };
 
-    model.on(propertyName, function () {
-      binding.source = model[propertyName]; // todo: what if property has nested call? foo.x?
+    model.bind(propertyName, function (value) {
+      binding.source = value; // todo: what if property has nested call? foo.x?
 
       if (binding.isDirty) return; // already in the queue.
       binding.isDirty = true;

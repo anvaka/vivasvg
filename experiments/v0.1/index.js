@@ -21,7 +21,7 @@ setInterval(function () {
     model = models[i];
     model.x += model.dx; if (model.x < 0 || model.x > 640 ) { model.dx *= -1; model.x += model.dx; }
     model.y += model.dy; if (model.y < 0 || model.y > 480 ) { model.dy *= -1; model.y += model.dy; }
-    model.fire('x'); model.fire('y');
+    model.invalidate('x', 'y');
   }
   // fire() will mark all bindings which are using this model as `dirty`
   // and eventually, during RAF loop, will result in UI update
