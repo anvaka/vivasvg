@@ -40,7 +40,7 @@ function animateItems(points) {
       pt.dy *= -1;
       y += pt.dy;
     }
-    pt.x.value = x;
-    pt.y.value = y;
+    pt.x.newValueSpecifiedUnits(SVGLength.SVG_LENGTHTYPE_NUMBER, x);
+    pt.y.newValueSpecifiedUnits(SVGLength.SVG_LENGTHTYPE_NUMBER, y);
   }
 }
