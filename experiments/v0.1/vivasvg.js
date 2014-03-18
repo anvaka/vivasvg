@@ -1,7 +1,10 @@
 /**
- * Just an experimental binding provider
+ * Expose binding rule factory for anyone to create new custom binding rules
  */
-module.exports.makeBinding = makeBinding;
+module.exports.bindingRule = require('./lib/binding/bindingRule').bindingRule;
+// make sure we have all our optimized binding rules setup:
+require('./lib/binding/standardBindings');
+
 module.exports.model = model;
 module.exports.bindingGroup = bindingGroup;
 
@@ -31,7 +34,7 @@ function bindingGroup() {
   function bind(target, source) {
     var attributes = target.attributes;
     var tagName = target.localName;
-    var tagBindingRules = registeredBindings[tagName];
+    var tagBindingRules = require('./lib/binding/bindingRule').getTagRules(tagName);
     var BINDING_EXPR = /{{(.+?)}}/;
     for (var i = 0; i < attributes.length; ++i) {
       var attr = attributes[i];
@@ -54,12 +57,13 @@ function bindingGroup() {
   function createBinding(setter, propertyName, model, target) {
     var binding = {
       isDirty: false,
-      set : setter,
-      target: target,
-      source: function () { return model[propertyName]; } // todo: what if property has nested call? foo.x?
+      set : setter(target),
+      source: undefined
     };
 
     model.on(propertyName, function () {
+      binding.source = model[propertyName]; // todo: what if property has nested call? foo.x?
+
       if (binding.isDirty) return; // already in the queue.
       binding.isDirty = true;
       dirtyBindings[dirtyLength++] = binding;
@@ -69,24 +73,10 @@ function bindingGroup() {
   function updateTargets() {
     for (var i = 0; i < dirtyLength; ++i) {
       var binding = dirtyBindings[i];
-      binding.set(binding.target, binding.source());
+      binding.set(binding.source);
       binding.isDirty = false;
     }
 
     dirtyLength = 0;
-  }
-}
-
-var registeredBindings = Object.create(null);
-function makeBinding(elementName, attrName, cb) {
-  var elementBindings = registeredBindings[elementName];
-  if (!elementBindings) {
-    elementBindings = registeredBindings[elementName] = Object.create(null);
-  }
-  var attrBindings = elementBindings[attrName];
-  if (!attrBindings) {
-    elementBindings[attrName] = cb;
-  } else {
-    throw new Error('Element ' + elementName + ' already has registered binding for '  + attrName);
   }
 }

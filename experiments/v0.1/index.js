@@ -1,12 +1,4 @@
 var vivasvg = require('./vivasvg');
-// register 'standard' rules for binding:
-vivasvg.makeBinding('circle', 'cx', function (ui, newValue) {
-  ui.cx.baseVal.value = newValue;
-});
-
-vivasvg.makeBinding('circle', 'cy', function (ui, newValue) {
-  ui.cy.baseVal.value = newValue;
-});
 
 var bindingGroup = vivasvg.bindingGroup();
 var models = createModels(4000);
@@ -29,8 +21,7 @@ setInterval(function () {
     model = models[i];
     model.x += model.dx; if (model.x < 0 || model.x > 640 ) { model.dx *= -1; model.x += model.dx; }
     model.y += model.dy; if (model.y < 0 || model.y > 480 ) { model.dy *= -1; model.y += model.dy; }
-    model.fire('x');
-    model.fire('y');
+    model.fire('x'); model.fire('y');
   }
   // fire() will mark all bindings which are using this model as `dirty`
   // and eventually, during RAF loop, will result in UI update

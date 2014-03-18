@@ -16,6 +16,6 @@
     "url": "https://github.com/anvaka/vivasvg"
   },
   "dependencies": {
-    "ngraph.events": "0.0.2"
+    "ngraph.events": "0.0.3"
   }
 }
