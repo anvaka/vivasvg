@@ -1,6 +1,6 @@
 # vivasvg
 
-SVG rendering library with emphasis on declarative API
+SVG rendering library with emphasis on declarative API. 
 
 # Demo
 
@@ -44,6 +44,14 @@ I will not be disappointed if this repository will also be a failure. Please
 don't use this, unless you also believe it's a nice experiment or want to help me.
 
 I'd love to know what you think :)!
+
+# Evolution
+
+[vivagraph](https://github.com/anvaka/VivaGraphJS) -> [ngraph](https://github.com/anvaka/ngraph) -> vivasvg
+
+Vivagraph always supported svg at very low level API. `ngraph` is an effort
+to restructure vivagraph into small modules. While doing so, I decided to improve
+svg support, and thus vivasvg was born.
 
 # license
 
