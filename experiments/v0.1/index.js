@@ -43,7 +43,7 @@ function createViewModels(count) {
   var viewModels = [];
   for (var i = 0; i < count; ++i) {
     viewModels.push(
-      vivasvg.model({ x: Math.random() * 640, y: Math.random() * 480, dx: Math.random() * 10 - 5 , dy: Math.random() * 10 - 5 })
+      vivasvg.viewModel({ x: Math.random() * 640, y: Math.random() * 480, dx: Math.random() * 10 - 5 , dy: Math.random() * 10 - 5 })
     );
   }
   return viewModels;
