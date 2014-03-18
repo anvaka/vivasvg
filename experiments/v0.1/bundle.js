@@ -50,7 +50,7 @@ function createModels(count) {
   return models;
 }
 
-},{"./vivasvg":5}],2:[function(require,module,exports){
+},{"./vivasvg":6}],2:[function(require,module,exports){
 /**
  * Binding group holds collection of bindings. Main reason why binding group
  * exists is to provide delayed update of binding targets.
@@ -165,6 +165,16 @@ function getTagRules(tagName) {
 }
 
 },{}],4:[function(require,module,exports){
+module.exports = model;
+
+var eventify = require('ngraph.events');
+function model(rawObject) {
+  eventify(rawObject);
+  return rawObject;
+}
+
+
+},{"ngraph.events":7}],5:[function(require,module,exports){
 /**
  * This file contains optimized target setters for standard svg properties.
  *
@@ -190,7 +200,7 @@ bindingRule('circle', 'cy', function (ui) {
   };
 });
 
-},{"./bindingRule":3}],5:[function(require,module,exports){
+},{"./bindingRule":3}],6:[function(require,module,exports){
 // make sure we have all our optimized binding rules setup:
 require('./lib/binding/standardBindings');
 
@@ -199,19 +209,17 @@ require('./lib/binding/standardBindings');
  */
 module.exports.bindingRule = require('./lib/binding/bindingRule').bindingRule;
 
+/**
+ * Let clients create new data models. Unlike angular, we require all models
+ * to share same interface. This makes use of the binding sources somewhat
+ * restrictive, but allows us to fine-tune performance at very low level.
+ */
+module.exports.model = require('./lib/binding/model');
+
 // todo: do we need to expose this?
 module.exports.bindingGroup = require('./lib/binding/bindingGroup');
 
-module.exports.model = model;
-
-var eventify = require('ngraph.events');
-function model(rawObject) {
-  eventify(rawObject);
-  return rawObject;
-}
-
-
-},{"./lib/binding/bindingGroup":2,"./lib/binding/bindingRule":3,"./lib/binding/standardBindings":4,"ngraph.events":6}],6:[function(require,module,exports){
+},{"./lib/binding/bindingGroup":2,"./lib/binding/bindingRule":3,"./lib/binding/model":4,"./lib/binding/standardBindings":5}],7:[function(require,module,exports){
 module.exports = function(subject) {
   validateSubject(subject);
 
