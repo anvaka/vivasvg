@@ -30,7 +30,14 @@ setInterval(function () {
   // angular, use case with 4k dom elements is absolutely valid
 }, 1000/60);
 
-bindingGroup.run();
+
+// normally this would be done by vivasvg internally. But we are in prototype
+// phase here.
+animate();
+function animate() {
+  requestAnimationFrame(animate);
+  bindingGroup.updateTargets();
+}
 
 function createModels(count) {
   var models = [];

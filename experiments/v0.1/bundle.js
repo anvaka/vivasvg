@@ -1,13 +1,5 @@
 ;(function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);throw new Error("Cannot find module '"+o+"'")}var f=n[o]={exports:{}};t[o][0].call(f.exports,function(e){var n=t[o][1][e];return s(n?n:e)},f,f.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
 var vivasvg = require('./vivasvg');
-// register 'standard' rules for binding:
-vivasvg.makeBinding('circle', 'cx', function (ui, newValue) {
-  ui.cx.baseVal.value = newValue;
-});
-
-vivasvg.makeBinding('circle', 'cy', function (ui, newValue) {
-  ui.cy.baseVal.value = newValue;
-});
 
 var bindingGroup = vivasvg.bindingGroup();
 var models = createModels(4000);
@@ -30,8 +22,7 @@ setInterval(function () {
     model = models[i];
     model.x += model.dx; if (model.x < 0 || model.x > 640 ) { model.dx *= -1; model.x += model.dx; }
     model.y += model.dy; if (model.y < 0 || model.y > 480 ) { model.dy *= -1; model.y += model.dy; }
-    model.fire('x');
-    model.fire('y');
+    model.fire('x'); model.fire('y');
   }
   // fire() will mark all bindings which are using this model as `dirty`
   // and eventually, during RAF loop, will result in UI update
@@ -40,7 +31,14 @@ setInterval(function () {
   // angular, use case with 4k dom elements is absolutely valid
 }, 1000/60);
 
-bindingGroup.run();
+
+// normally this would be done by vivasvg internally. But we are in prototype
+// phase here.
+animate();
+function animate() {
+  requestAnimationFrame(animate);
+  bindingGroup.updateTargets();
+}
 
 function createModels(count) {
   var models = [];
@@ -52,42 +50,37 @@ function createModels(count) {
   return models;
 }
 
-},{"./vivasvg":2}],2:[function(require,module,exports){
+},{"./vivasvg":5}],2:[function(require,module,exports){
 /**
- * Just an experimental binding provider
+ * Binding group holds collection of bindings. Main reason why binding group
+ * exists is to provide delayed update of binding targets.
+ *
+ * When binding source notifies a binding object about change, binding object
+ * may not immediately update target. All updates should happen within
+ * one call inside RequestAnimationFrame callback to optimize rendering performance
+ *
+ * Thus each binding object marks itself as dirty when source changes, and
+ * registers itself within binding group for update when possible.
  */
-module.exports.makeBinding = makeBinding;
-module.exports.model = model;
-module.exports.bindingGroup = bindingGroup;
+module.exports = bindingGroup;
 
-var eventify = require('ngraph.events');
-function model(rawObject) {
-  eventify(rawObject);
-  return rawObject;
-}
+var getTagRules = require('./bindingRule').getTagRules;
+var BINDING_EXPR = /{{(.+?)}}/;
 
 function bindingGroup() {
   var dirtyBindings = [];
-  var allBindings = []; // use this to dispose bindings.
+  var allBindings = []; // TODO: use this to dispose bindings.
   var dirtyLength = 0;
 
   return {
-    run: run,
-    bind: bind
+    bind: bind,
+    updateTargets: updateTargets
   };
-
-  function run() {
-    requestAnimationFrame(run);
-    if (dirtyLength) {
-      updateTargets();
-    }
-  }
 
   function bind(target, source) {
     var attributes = target.attributes;
-    var tagName = target.localName;
-    var tagBindingRules = registeredBindings[tagName];
-    var BINDING_EXPR = /{{(.+?)}}/;
+    var tagBindingRules = getTagRules(target.localName);
+
     for (var i = 0; i < attributes.length; ++i) {
       var attr = attributes[i];
       var value = attr.value;
@@ -101,20 +94,22 @@ function bindingGroup() {
       if (attrName[0] === '_') attrName = attrName.substr(1);
       var targetSetter = tagBindingRules[attrName];
       if (targetSetter) {
-        allBindings.push(createBinding(targetSetter, propertyName, source, target));
+        var binding = createBinding(targetSetter(target), propertyName, source);
+        allBindings.push(binding);
       }
     }
   }
 
-  function createBinding(setter, propertyName, model, target) {
+  function createBinding(setter, propertyName, model) {
     var binding = {
       isDirty: false,
       set : setter,
-      target: target,
-      source: function () { return model[propertyName]; } // todo: what if property has nested call? foo.x?
+      source: undefined
     };
 
     model.on(propertyName, function () {
+      binding.source = model[propertyName]; // todo: what if property has nested call? foo.x?
+
       if (binding.isDirty) return; // already in the queue.
       binding.isDirty = true;
       dirtyBindings[dirtyLength++] = binding;
@@ -122,9 +117,10 @@ function bindingGroup() {
   }
 
   function updateTargets() {
+    if (!dirtyLength) return;
     for (var i = 0; i < dirtyLength; ++i) {
       var binding = dirtyBindings[i];
-      binding.set(binding.target, binding.source());
+      binding.set(binding.source);
       binding.isDirty = false;
     }
 
@@ -132,21 +128,90 @@ function bindingGroup() {
   }
 }
 
-var registeredBindings = Object.create(null);
-function makeBinding(elementName, attrName, cb) {
-  var elementBindings = registeredBindings[elementName];
-  if (!elementBindings) {
-    elementBindings = registeredBindings[elementName] = Object.create(null);
+},{"./bindingRule":3}],3:[function(require,module,exports){
+/**
+ * This file defines a factory method for new binding rules. Each rule is applicable
+ * based on tag name/attribute name pair.
+ */
+module.exports.bindingRule = bindingRule;
+module.exports.getTagRules = getTagRules;
+
+// This is a dictionary of all known bindings.
+//   tagName => [attrName1, attrName2, ...]
+//     attrName1 => function customSetter() {}
+//     attrName2 => function customSetter() {}
+// TODO: Add wildcard rules. E.g. * -> * -> element.setAttributeNS();
+var knownBindings = Object.create(null);
+
+function bindingRule(tagName, attrName, setter) {
+  if (typeof setter !== 'function') {
+    throw new Error('Setter is expected to be a function, found: ', setter);
   }
-  var attrBindings = elementBindings[attrName];
-  if (!attrBindings) {
-    elementBindings[attrName] = cb;
+
+  var tagRules = knownBindings[tagName];
+  if (!tagRules) {
+    // tag rules contains binding rules for each attribute on this tag
+    tagRules = knownBindings[tagName] = Object.create(null);
+  }
+  if (!tagRules[attrName]) {
+    tagRules[attrName] = setter;
   } else {
-    throw new Error('Element ' + elementName + ' already has registered binding for '  + attrName);
+    throw new Error('Element ' + tagName + ' already has registered binding for '  + attrName);
   }
 }
 
-},{"ngraph.events":3}],3:[function(require,module,exports){
+function getTagRules(tagName) {
+  return knownBindings[tagName];
+}
+
+},{}],4:[function(require,module,exports){
+/**
+ * This file contains optimized target setters for standard svg properties.
+ *
+ * Usually it is much faster to use property specific setters than generic
+ * element.setAttributeNS() method.
+ *
+ * For example circle.cx.baseVal.value is ~2x faster than setAttributeNS(null, 'cx', x) api.
+ */
+
+var bindingRule = require('./bindingRule').bindingRule;
+
+bindingRule('circle', 'cx', function (ui) {
+  var baseVal = ui.cx.baseVal;
+  return function (newValue) {
+    baseVal.value = newValue;
+  };
+});
+
+bindingRule('circle', 'cy', function (ui) {
+  var baseVal = ui.cy.baseVal;
+  return function (newValue) {
+    baseVal.value = newValue;
+  };
+});
+
+},{"./bindingRule":3}],5:[function(require,module,exports){
+// make sure we have all our optimized binding rules setup:
+require('./lib/binding/standardBindings');
+
+/**
+ * Expose binding rule factory for anyone to create new custom binding rules
+ */
+module.exports.bindingRule = require('./lib/binding/bindingRule').bindingRule;
+
+// todo: do we need to expose this?
+module.exports.bindingGroup = require('./lib/binding/bindingGroup');
+
+module.exports.model = model;
+
+var eventify = require('ngraph.events');
+function model(rawObject) {
+  eventify(rawObject);
+  return rawObject;
+}
+
+
+},{"./lib/binding/bindingGroup":2,"./lib/binding/bindingRule":3,"./lib/binding/standardBindings":4,"ngraph.events":6}],6:[function(require,module,exports){
 module.exports = function(subject) {
   validateSubject(subject);
 
@@ -163,17 +228,18 @@ function createEventsStorage(subject) {
   //
   // A callback record consists of callback function and its optional context:
   // { 'eventName' => [{callback: function, ctx: object}] }
-  var registeredEvents = {};
+  var registeredEvents = Object.create(null);
 
   return {
     on: function (eventName, callback, ctx) {
       if (typeof callback !== 'function') {
         throw new Error('callback is expected to be a function');
       }
-      if (!registeredEvents.hasOwnProperty(eventName)) {
-        registeredEvents[eventName] = [];
+      var handlers = registeredEvents[eventName];
+      if (!handlers) {
+        handlers = registeredEvents[eventName] = [];
       }
-      registeredEvents[eventName].push({callback: callback, ctx: ctx});
+      handlers.push({callback: callback, ctx: ctx});
 
       return subject;
     },
@@ -182,11 +248,11 @@ function createEventsStorage(subject) {
       var wantToRemoveAll = (typeof eventName === 'undefined');
       if (wantToRemoveAll) {
         // Killing old events storage should be enough in this case:
-        registeredEvents = {};
+        registeredEvents = Object.create(null);
         return subject;
       }
 
-      if (registeredEvents.hasOwnProperty(eventName)) {
+      if (registeredEvents[eventName]) {
         var deleteAllCallbacksForEvent = (typeof callback !== 'function');
         if (deleteAllCallbacksForEvent) {
           delete registeredEvents[eventName];
@@ -204,12 +270,11 @@ function createEventsStorage(subject) {
     },
 
     fire: function (eventName) {
-      var noEventsToFire = !registeredEvents.hasOwnProperty(eventName);
-      if (noEventsToFire) {
-        return subject; 
+      var callbacks = registeredEvents[eventName];
+      if (!callbacks) {
+        return subject;
       }
 
-      var callbacks = registeredEvents[eventName];
       var fireArguments;
       if (arguments.length > 1) {
         fireArguments = Array.prototype.splice.call(arguments, 1);
