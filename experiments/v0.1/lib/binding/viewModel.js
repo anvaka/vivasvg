@@ -1,6 +1,6 @@
-module.exports = model;
+module.exports = viewModel;
 
-function model(rawObject) {
+function viewModel(rawObject) {
   var boundProperties = Object.create(null);
 
   rawObject.bind = function (propertyName, changed) {
@@ -23,4 +23,3 @@ function model(rawObject) {
 
   return rawObject;
 }
-

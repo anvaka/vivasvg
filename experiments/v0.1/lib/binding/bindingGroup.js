@@ -24,7 +24,7 @@ function bindingGroup() {
     updateTargets: updateTargets
   };
 
-  function bind(target, source) {
+  function bind(target, viewModel) {
     var attributes = target.attributes;
     var tagBindingRules = getTagRules(target.localName);
 
@@ -41,21 +41,21 @@ function bindingGroup() {
       if (attrName[0] === '_') attrName = attrName.substr(1);
       var targetSetter = tagBindingRules[attrName];
       if (targetSetter) {
-        var binding = createBinding(targetSetter(target), propertyName, source);
+        var binding = createBinding(targetSetter(target), propertyName, viewModel);
         allBindings.push(binding);
       }
     }
   }
 
-  function createBinding(setter, propertyName, model) {
+  function createBinding(setter, propertyName, viewModel) {
     var binding = {
       isDirty: false,
       set : setter,
       source: undefined
     };
 
-    model.bind(propertyName, function (value) {
-      binding.source = value; // todo: what if property has nested call? foo.x?
+    viewModel.bind(propertyName, function (value) {
+      binding.source = value;
 
       if (binding.isDirty) return; // already in the queue.
       binding.isDirty = true;

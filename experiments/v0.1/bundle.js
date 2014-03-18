@@ -2,7 +2,7 @@
 var vivasvg = require('./vivasvg');
 
 var bindingGroup = vivasvg.bindingGroup();
-var models = createModels(4000);
+var models = createModels(8000);
 var scene = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
 document.body.appendChild(scene);
 
@@ -24,7 +24,7 @@ setInterval(function () {
     model.y += model.dy; if (model.y < 0 || model.y > 480 ) { model.dy *= -1; model.y += model.dy; }
     model.invalidate('x', 'y');
   }
-  // fire() will mark all bindings which are using this model as `dirty`
+  // invalidate() will mark all bindings which are using this model as `dirty`
   // and eventually, during RAF loop, will result in UI update
   // Note: Unlike angular, this needs to be explicit. We are focused on
   // performance here and cannot afford diff algorithm within 16ms. Also unlike
@@ -169,6 +169,7 @@ module.exports = model;
 
 function model(rawObject) {
   var boundProperties = Object.create(null);
+
   rawObject.bind = function (propertyName, changed) {
     var callbacks = boundProperties[propertyName];
     if (!callbacks) {
