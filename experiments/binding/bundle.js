@@ -10,14 +10,14 @@ vivasvg.makeBinding('circle', 'cy', function (ui, newValue) {
 });
 
 var bindingGroup = vivasvg.bindingGroup();
-var models = createModels(8000);
+var models = createModels(4000);
 var scene = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
 document.body.appendChild(scene);
 
 for (var i = 0; i < models.length; ++i) {
   var circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-  circle.setAttributeNS(null, 's-cx', '{{x}}');
-  circle.setAttributeNS(null, 's-cy', '{{y}}');
+  circle.setAttributeNS(null, '_cx', '{{x}}');
+  circle.setAttributeNS(null, '_cy', '{{y}}');
   circle.setAttributeNS(null, 'r', '1');
   bindingGroup.bind(circle, models[i]);
 
@@ -29,7 +29,7 @@ setInterval(function () {
   for (var i = 0; i < models.length; ++i) {
     model = models[i];
     model.x += model.dx; if (model.x < 0 || model.x > 640 ) { model.dx *= -1; model.x += model.dx; }
-    model.y += model.dy; if (model.y < 0 || model.y > 640 ) { model.dy *= -1; model.y += model.dy; }
+    model.y += model.dy; if (model.y < 0 || model.y > 480 ) { model.dy *= -1; model.y += model.dy; }
     model.fire('x');
     model.fire('y');
   }
@@ -38,7 +38,7 @@ setInterval(function () {
   // Note: Unlike angular, this needs to be explicit. We are focused on
   // performance here and cannot afford diff algorithm within 16ms. Also unlike
   // angular, use case with 4k dom elements is absolutely valid
-});
+}, 1000/60);
 
 bindingGroup.run();
 
@@ -68,6 +68,7 @@ function model(rawObject) {
 
 function bindingGroup() {
   var dirtyBindings = [];
+  var allBindings = []; // use this to dispose bindings.
   var dirtyLength = 0;
 
   return {
@@ -83,25 +84,40 @@ function bindingGroup() {
   }
 
   function bind(target, source) {
-    var cx = registeredBindings.circle.cx;
-    var bindingX = {
-      set: registeredBindings.circle.cx,
-      target: target,
-      source: function () { return source.x; }
-    };
-    source.on('x', function () {
-      dirtyBindings[dirtyLength++] = bindingX;
-    });
+    var attributes = target.attributes;
+    var tagName = target.localName;
+    var tagBindingRules = registeredBindings[tagName];
+    var BINDING_EXPR = /{{(.+?)}}/;
+    for (var i = 0; i < attributes.length; ++i) {
+      var attr = attributes[i];
+      var value = attr.value;
+      var propertyMatch = value.match(BINDING_EXPR);
+      if (!propertyMatch) continue;
 
-    var cy = registeredBindings.circle.cy;
-    var bindingY = {
-      set: registeredBindings.circle.cy,
+      var propertyName = propertyMatch[1];
+      var attrName = attr.localName;
+      // Since SVG attribute values are very restrictive we cannot set them to
+      // {{foo}}. Thus we allow to have "mirror" attribute names prefixed with _
+      if (attrName[0] === '_') attrName = attrName.substr(1);
+      var targetSetter = tagBindingRules[attrName];
+      if (targetSetter) {
+        allBindings.push(createBinding(targetSetter, propertyName, source, target));
+      }
+    }
+  }
+
+  function createBinding(setter, propertyName, model, target) {
+    var binding = {
+      isDirty: false,
+      set : setter,
       target: target,
-      source: function () { return source.y; }
+      source: function () { return model[propertyName]; } // todo: what if property has nested call? foo.x?
     };
 
-    source.on('y', function () {
-      dirtyBindings[dirtyLength++] = bindingY;
+    model.on(propertyName, function () {
+      if (binding.isDirty) return; // already in the queue.
+      binding.isDirty = true;
+      dirtyBindings[dirtyLength++] = binding;
     });
   }
 
@@ -109,7 +125,9 @@ function bindingGroup() {
     for (var i = 0; i < dirtyLength; ++i) {
       var binding = dirtyBindings[i];
       binding.set(binding.target, binding.source());
+      binding.isDirty = false;
     }
+
     dirtyLength = 0;
   }
 }
