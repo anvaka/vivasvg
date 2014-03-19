@@ -1,4 +1,4 @@
-var vivasvg = require('./vivasvg');
+var vivasvg = require('../../vivasvg');
 
 var bindingGroup = vivasvg.bindingGroup();
 var viewModels = createViewModels(4000);
