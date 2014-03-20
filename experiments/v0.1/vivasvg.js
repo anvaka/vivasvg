@@ -1,5 +1,6 @@
 // make sure we have all our optimized binding rules setup:
 require('./lib/binding/standardBindings');
+require('./lib/compiler/standardTags');
 
 /**
  * Expose binding rule factory for anyone to create new custom binding rules
@@ -15,3 +16,5 @@ module.exports.viewModel = require('./lib/binding/viewModel');
 
 // todo: do we need to expose this?
 module.exports.bindingGroup = require('./lib/binding/bindingGroup');
+
+module.exports.createApp = require('./lib/createApp');
