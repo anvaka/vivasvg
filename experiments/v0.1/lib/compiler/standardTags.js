@@ -1,14 +1,14 @@
 var compiler = require('./compiler');
 var binding = require('../binding/bindingRule');
 
-compiler.createTag('items', function (tag) {
+compiler.createTag('items', function (tag, compile) {
   var g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
   var itemTemplate = tag.children[0];
 
   tag.api = {
     appendItem: function (model) {
-      var child = itemTemplate.clone(true);
-      g.appendChild(child);
+      var child = itemTemplate.cloneNode(true);
+      g.appendChild(compile(child)(model));
     }
   };
 

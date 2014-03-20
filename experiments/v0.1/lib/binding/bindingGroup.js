@@ -16,7 +16,6 @@ var BINDING_EXPR = /{{(.+?)}}/;
 
 function bindingGroup() {
   var dirtyBindings = [];
-  var allBindings = []; // TODO: use this to dispose bindings.
   var dirtyLength = 0;
 
   return {
@@ -43,8 +42,7 @@ function bindingGroup() {
       if (targetSetter) {
         var setter = targetSetter(target);
         if (typeof setter !== 'function') throw new Error('Binding rule expected to return function. ' + target.localName + '[' + attrName + ']');
-        var binding = createBinding(setter, propertyName, viewModel);
-        allBindings.push(binding);
+        createBinding(setter, propertyName, viewModel);
         viewModel.invalidate(propertyName);
       }
     }

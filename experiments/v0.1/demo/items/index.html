@@ -9,8 +9,10 @@
   </head>
   <body>
     <svg id='scene' xmlns='http://www.w3.org/2000/svg'>
-      <items source="{{circles}}">
-        <circle _cx="{{x}}" _cy="{{cy}}" r="1"></circle>
+      <items source="{{groups}}">
+        <items source="{{circles}}">
+          <circle _cx="{{x}}" _cy="{{y}}" r="1"></circle>
+        </items>
       </items>
     </svg>
     <script src='bundle.js' type="text/javascript" charset="utf-8">

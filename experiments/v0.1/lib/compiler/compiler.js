@@ -18,4 +18,34 @@ function createTag(tagName, creator) {
 }
 
 function compile(root, bindingGroup) {
+  var tag = tagLib[root.localName];
+  var childLink;
+
+  if (tag) {
+    var dom = tag(root, nestedCompile);
+    if (dom && root.parentElement) {
+      root.parentElement.replaceChild(dom, root);
+    }
+  } else {
+    var children = root.children;
+    if (children.length) childLink = [];
+    for (var i = 0; i < children.length; ++i) {
+      childLink.push(compile(children[i], bindingGroup));
+    }
+  }
+
+  return function (model) {
+    if (childLink) {
+      for (var i = 0; i < childLink.length; ++i) {
+        childLink[i](model);
+      }
+    }
+
+    bindingGroup.bind(root, model);
+    return dom || root;
+  };
+
+  function nestedCompile(root) {
+    return compile(root, bindingGroup);
+  }
 }
