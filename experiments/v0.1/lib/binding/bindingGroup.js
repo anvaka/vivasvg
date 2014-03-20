@@ -41,8 +41,11 @@ function bindingGroup() {
       if (attrName[0] === '_') attrName = attrName.substr(1);
       var targetSetter = tagBindingRules[attrName];
       if (targetSetter) {
-        var binding = createBinding(targetSetter(target), propertyName, viewModel);
+        var setter = targetSetter(target);
+        if (typeof setter !== 'function') throw new Error('Binding rule expected to return function. ' + target.localName + '[' + attrName + ']');
+        var binding = createBinding(setter, propertyName, viewModel);
         allBindings.push(binding);
+        viewModel.invalidate(propertyName);
       }
     }
   }
