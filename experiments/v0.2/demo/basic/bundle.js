@@ -11,7 +11,7 @@ setInterval(function () {
   dataContext.invalidate('x', 'y');
 }, 1000/60);
 
-},{"../../vivasvg":6}],2:[function(require,module,exports){
+},{"../../vivasvg":7}],2:[function(require,module,exports){
 module.exports = function app(dom, context) {
   var bindingGroup = require('./binding/bindingGroup')();
   var virtualDom = require('./compile/compile')(dom, bindingGroup);
@@ -116,6 +116,7 @@ module.exports = compile;
 
 var BINDING_EXPR = /{{(.+?)}}/;
 var knownTags = Object.create(null);
+var defaultFactory = require('./tags/default');
 
 function compile(domNode, bindingGroup) {
   var virtualChildren = [];
@@ -124,21 +125,49 @@ function compile(domNode, bindingGroup) {
     virtualChildren.push(compile(domChildren[i], bindingGroup));
   }
 
+  var tagFactory = knownTags[domNode.localName] || defaultFactory;
+  return tagFactory({
+    children: virtualChildren,
+    attributes: compileAttributes(domNode, bindingGroup),
+    domNode: domNode
+  });
+}
+
+function compileAttributes(domNode, bindingGroup) {
   var observableAttributes = [];
   var attributes = domNode.attributes;
+
   for (i = 0; i < attributes.length; ++i) {
     var attr = attributes[i];
     var observable = createObservableAttribute(attr, bindingGroup);
     if (observable) observableAttributes.push(observable);
   }
 
-  var tagFactory = knownTags[domNode.localName] || defaultFactory;
-  return tagFactory({
-    children: virtualChildren,
-    attributes: observableAttributes,
-    domNode: domNode
-  });
+  return observableAttributes;
 }
+
+function createObservableAttribute(attribute, bindingGroup) {
+  var value = attribute.value;
+  var propertyMatch = value.match(BINDING_EXPR);
+  if (!propertyMatch) return;
+
+  var name = attribute.localName;
+  if (name[0] === '_') name = name.substr(1);
+  var propertyName = propertyMatch[1];
+
+  return {
+    name: name,
+    observe: function (viewModel, valueChanged) {
+      bindingGroup.createBinding(valueChanged, propertyName, viewModel);
+    }
+  };
+}
+
+},{"./tags/default":6}],6:[function(require,module,exports){
+/**
+ * If compiler does not know how to compile a tag it will fallback to this method.
+ */
+module.exports = defaultFactory;
 
 function defaultFactory(virtualRoot) {
   return function (model) {
@@ -169,24 +198,8 @@ function monitorAttribute(attribute, domElement, model) {
   });
 }
 
-function createObservableAttribute(attribute, bindingGroup) {
-  var value = attribute.value;
-  var propertyMatch = value.match(BINDING_EXPR);
-  if (!propertyMatch) return;
 
-  var name = attribute.localName;
-  if (name[0] === '_') name = name.substr(1);
-  var propertyName = propertyMatch[1];
-
-  return {
-    name: name,
-    observe: function (viewModel, valueChanged) {
-      bindingGroup.createBinding(valueChanged, propertyName, viewModel);
-    }
-  };
-}
-
-},{}],6:[function(require,module,exports){
+},{}],7:[function(require,module,exports){
 module.exports.app = require('./lib/app');
 module.exports.viewModel = require('./lib/binding/viewModel');
 
