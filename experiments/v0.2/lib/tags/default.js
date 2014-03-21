@@ -11,8 +11,8 @@ function defaultFactory(virtualRoot) {
         var shallowCopy = virtualRoot.domNode.cloneNode(false);
 
         var attributes = virtualRoot.attributes;
-        for (i = 0; i < attributes.length; ++i) {
-          monitorAttribute(attributes[i], shallowCopy, model);
+        for (var name in attributes) {
+          monitorAttribute(attributes[name], shallowCopy, model);
         }
 
         var children = virtualRoot.children;

@@ -1,15 +1,33 @@
 ;(function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);throw new Error("Cannot find module '"+o+"'")}var f=n[o]={exports:{}};t[o][0].call(f.exports,function(e){var n=t[o][1][e];return s(n?n:e)},f,f.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
 var vivasvg = require('../../vivasvg');
+var countMatch = window.location.href.match(/q=(\d+)/);
+var count = (countMatch && countMatch[1]) || 100;
+var svgApp = vivasvg.app(document.getElementById('scene'), createViewModel(count));
+svgApp.run();
 
-var dataContext = vivasvg.viewModel({x: 320, y: 240});
-var app = vivasvg.app(document.getElementById('scene'), dataContext);
-app.run();
 
-setInterval(function () {
-  dataContext.x += Math.random() * 8 - 4;
-  dataContext.y += Math.random() * 8 - 4;
-  dataContext.invalidate('x', 'y');
-}, 1000/60);
+function createViewModel(count) {
+  var viewModels = [];
+  for (var i = 0; i < count; ++i) {
+    viewModels.push(
+      vivasvg.viewModel({ x: Math.random() * 640, y: Math.random() * 480, dx: Math.random() * 10 - 5 , dy: Math.random() * 10 - 5 })
+    );
+  }
+
+  // Start animation loop (yes, outside of RAF, this is totally OK):
+  setInterval(function () {
+    for (var i = 0; i < viewModels.length; ++i) {
+      model = viewModels[i];
+      model.x += model.dx; if (model.x < 0 || model.x > 640 ) { model.dx *= -1; model.x += model.dx; }
+      model.y += model.dy; if (model.y < 0 || model.y > 480 ) { model.dy *= -1; model.y += model.dy; }
+      model.invalidate('x', 'y');
+    }
+  }, 1000/60);
+
+  return vivasvg.viewModel({
+    circles: viewModels
+  });
+}
 
 },{"../../vivasvg":9}],2:[function(require,module,exports){
 module.exports = function app(dom, context) {
@@ -245,7 +263,7 @@ createTag('items', function (virtual){
       create: function () {
         var g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
         var template = virtual.children[0];
-        var itemsSource = virtual.attributes.items;
+        var itemsSource = virtual.attributes.source;
 
         itemsSource.observe(model, function (newValue) {
           for (var i = 0; i < newValue.length; ++i) {

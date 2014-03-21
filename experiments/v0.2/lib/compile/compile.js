@@ -4,10 +4,8 @@
  */
 module.exports = compile;
 
+var tagLib = require('../tags/');
 var BINDING_EXPR = /{{(.+?)}}/;
-var knownTags = Object.create(null);
-
-var defaultFactory = require('./tags/default');
 
 function compile(domNode, bindingGroup) {
   var virtualChildren = [];
@@ -16,7 +14,7 @@ function compile(domNode, bindingGroup) {
     virtualChildren.push(compile(domChildren[i], bindingGroup));
   }
 
-  var tagFactory = knownTags[domNode.localName] || defaultFactory;
+  var tagFactory = tagLib.getTag(domNode.localName);
   return tagFactory({
     children: virtualChildren,
     attributes: compileAttributes(domNode, bindingGroup),
@@ -25,13 +23,13 @@ function compile(domNode, bindingGroup) {
 }
 
 function compileAttributes(domNode, bindingGroup) {
-  var observableAttributes = [];
+  var observableAttributes = Object.create(null);
   var attributes = domNode.attributes;
 
   for (i = 0; i < attributes.length; ++i) {
     var attr = attributes[i];
     var observable = createObservableAttribute(attr, bindingGroup);
-    if (observable) observableAttributes.push(observable);
+    if (observable) observableAttributes[observable.name] = observable;
   }
 
   return observableAttributes;
