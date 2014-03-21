@@ -20,12 +20,13 @@ function defaultFactory(virtualRoot) {
 
   return function (model) {
     return {
-      appendTo: function (parent) {
+      create: function () {
         var children = virtualRoot.children;
+        forEach(children, appendToTemplate);
         for (var i = 0; i < children.length; ++i) {
-          children[i](model).appendTo(template);
+          template.appendChild(children[i](model).create());
         }
-        parent.appendChild(template);
+        return template;
       }
     };
   };

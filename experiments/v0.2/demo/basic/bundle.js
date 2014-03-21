@@ -6,8 +6,8 @@ vivasvg.app(document.getElementById('scene'), {x: 10, y: 10});
 },{"../../vivasvg":4}],2:[function(require,module,exports){
 module.exports = function app(dom, context) {
   var virtualDom = require('./compile/compile')(dom);
-  virtualDom(context).appendTo(dom.parentNode);
-  dom.parentNode.removeChild(dom);
+  var newDom = virtualDom(context).create();
+  dom.parentNode.replaceChild(newDom, dom);
 };
 
 },{"./compile/compile":3}],3:[function(require,module,exports){
@@ -24,6 +24,7 @@ function compile(domNode) {
 
   var factory = knownTags[domNode.localName];
   if (!factory) factory = defaultFactory;
+
   return factory(virtualDom);
 }
 
@@ -32,12 +33,13 @@ function defaultFactory(virtualRoot) {
 
   return function (model) {
     return {
-      appendTo: function (parent) {
+      create: function () {
         var children = virtualRoot.children;
         for (var i = 0; i < children.length; ++i) {
-          children[i](model).appendTo(template);
+          var child = children[i](model).create();
+          template.appendChild(child);
         }
-        parent.appendChild(template);
+        return template;
       }
     };
   };
