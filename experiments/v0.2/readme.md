@@ -31,27 +31,26 @@ For example, how can we implement `items()`?
 ``` js
 function items(virtualRoot) {
   var itemTemplate = virtualRoot.children[0]; // first element is an item template
-  var attributes = virtualRoot.attrs;
+  var attributes = virtualRoot.attributes;
 
   // this is our thin wrapper:
   return function (model) {
     return {
-      appendTo: appendTo
+      create: function () {
+        var g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        parent.appendChild(g);
+        // listen to data items source changes:
+        attributes.source.observe(model, {
+          add: function (model) {
+            // and add dom elements when source collection changed
+            var child = itemTemplate(model);
+            g.appendChild(child.create());
+          }
+        });
+
+        return g;
+      }
     };
-
-    function appendTo(parent) {
-      var g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-      parent.appendChild(g);
-
-      // listen to data items source changes:
-      attributes.items.observe(model, {
-        add: function (model) {
-          // and add dom elements when source collection changed
-          var child = itemTemplate(model);
-          child.appendTo(g);
-        }
-      });
-    }
   }
 }
 ```
