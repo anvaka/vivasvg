@@ -22,7 +22,6 @@ function defaultFactory(virtualRoot) {
     return {
       create: function () {
         var children = virtualRoot.children;
-        forEach(children, appendToTemplate);
         for (var i = 0; i < children.length; ++i) {
           template.appendChild(children[i](model).create());
         }
