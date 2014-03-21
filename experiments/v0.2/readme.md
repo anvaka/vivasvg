@@ -57,3 +57,5 @@ function items(virtualRoot) {
 ```
 
 This may look a bit wordy, but it's only a prototype, 32 lines and we have `ng-repeat`-like tag
+
+[# Demo](https://anvaka.github.io/vivasvg/experiments/v0.2/demo/items/?q=1000)
