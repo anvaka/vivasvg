@@ -16,30 +16,29 @@ module.exports = compile;
 var knownTags = Object.create(null);
 
 function compile(domNode) {
-  var children = domNode.children;
-  var virtualDom = { children: [], domNode: domNode };
-  for (var i = 0; i < children.length; ++i) {
-    virtualDom.children.push(compile(children[i]));
+  var virtualChildren = [];
+  var domChildren = domNode.children;
+  for (var i = 0; i < domChildren.length; ++i) {
+    virtualChildren.push(compile(domChildren[i]));
   }
 
-  var factory = knownTags[domNode.localName];
-  if (!factory) factory = defaultFactory;
-
-  return factory(virtualDom);
+  var tagFactory = knownTags[domNode.localName] || defaultFactory;
+  return tagFactory({
+    children: virtualChildren,
+    domNode: domNode
+  });
 }
 
 function defaultFactory(virtualRoot) {
-  var template = virtualRoot.domNode.cloneNode(false);
-
   return function (model) {
     return {
       create: function () {
+        var shallowCopy = virtualRoot.domNode.cloneNode(false);
         var children = virtualRoot.children;
         for (var i = 0; i < children.length; ++i) {
-          var child = children[i](model).create();
-          template.appendChild(child);
+          shallowCopy.appendChild(children[i](model).create());
         }
-        return template;
+        return shallowCopy;
       }
     };
   };
