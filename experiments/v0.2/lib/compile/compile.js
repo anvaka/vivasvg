@@ -1,7 +1,12 @@
+/**
+ * Compiler traverses dom tree and produces virtual dom, which later
+ * can be injected with data context and rendered/appended to any parent
+ */
 module.exports = compile;
 
 var BINDING_EXPR = /{{(.+?)}}/;
 var knownTags = Object.create(null);
+
 var defaultFactory = require('./tags/default');
 
 function compile(domNode, bindingGroup) {

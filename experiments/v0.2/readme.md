@@ -10,7 +10,7 @@ Each dom node maps to a custom object. E.g. consider an example:
 </svg>
 ```
 
-Our compiler traverses the tree and find constructor functions:
+Our compiler traverses the tree and finds constructor functions:
 
 ``` js
 function svg() {}
