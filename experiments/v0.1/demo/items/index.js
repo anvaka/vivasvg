@@ -22,8 +22,6 @@ function createViewModel(count) {
   }, 1000/60);
 
   return vivasvg.viewModel({
-    groups: [vivasvg.viewModel({
-      circles: viewModels
-    })]
+    circles: viewModels
   });
 }
