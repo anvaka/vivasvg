@@ -23,38 +23,36 @@ points for custom elements (e.g. `items`).
 
 Each virtual dom element should have standard lifecycle:
 
-* Append to dom
+* Append to dom.
 * Remove from dom
 
 For example, how can we implement `items()`?
 
 ``` js
-function items(virtualRoot) {
-  var itemTemplate = virtualRoot.children[0]; // first element is an item template
-  var attributes = virtualRoot.attributes;
+createTag('items', function (itemsTag) {
+  itemsTag.bindRule('source', itemsSourceRule);
 
-  // this is our thin wrapper:
-  return function (model) {
-    return {
-      create: function () {
-        var g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-        parent.appendChild(g);
-        // listen to data items source changes:
-        attributes.source.observe(model, {
-          add: function (model) {
-            // and add dom elements when source collection changed
-            var child = itemTemplate(model);
-            g.appendChild(child.create());
-          }
-        });
+  return {
+    create: function (model) {
+      var g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
 
-        return g;
+      itemsTag.bind(model, { g: g, template: itemsTag.children[0]});
+
+      return g;
+    }
+  };
+
+  function itemsSourceRule(itemsControl) {
+    return function (newValue) {
+      for (var i = 0; i < newValue.length; ++i) {
+        var child = itemsControl.template.create(newValue[i]);
+        itemsControl.g.appendChild(child);
       }
     };
   }
-}
+});
 ```
 
-This may look a bit wordy, but it's only a prototype, 32 lines and we have `ng-repeat`-like tag
+21 lines and we have a prototype for `ng-repeat`-like tag.
 
 [# Demo](https://anvaka.github.io/vivasvg/experiments/v0.2/demo/items/?q=1000)
