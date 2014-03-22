@@ -9,9 +9,18 @@ svgApp.run();
 function createViewModel(count) {
   var viewModels = [];
   for (var i = 0; i < count; ++i) {
-    viewModels.push(
-      vivasvg.viewModel({ x: Math.random() * 640, y: Math.random() * 480, dx: Math.random() * 10 - 5 , dy: Math.random() * 10 - 5 })
-    );
+    var xSpeed = Math.random() * 10 - 5;
+    var color = Math.round(0.5 * xSpeed + 5);
+    color = '#' + ((color << 32) + (color << 16) + color);
+    var ball = {
+      x: Math.random() * 640,
+      y: Math.random() * 480,
+      dx: xSpeed,
+      dy: Math.random() * 10 - 5,
+      fill: color
+    };
+
+    viewModels.push(vivasvg.viewModel(ball));
   }
 
   // Start animation loop (yes, outside of RAF, this is totally OK):

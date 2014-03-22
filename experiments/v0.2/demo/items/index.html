@@ -3,6 +3,7 @@
   <head>
     <meta http-equiv="content-type" content="text/html; charset=utf-8" />
     <title>Binding?</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <style type="text/css" media="all">
       svg { width: 640px; height: 480px;}
     </style>
@@ -10,7 +11,7 @@
   <body>
     <svg id='scene' xmlns='http://www.w3.org/2000/svg'>
       <items source="{{circles}}">
-      <circle _cx="{{x}}" _cy="{{y}}" _r="{{dx}}"></circle>
+      <circle _cx="{{x}}" _cy="{{y}}" _r="{{dx}}" _fill="{{fill}}"></circle>
       </items>
     </svg>
     <script src='bundle.js' type="text/javascript" charset="utf-8">
