@@ -9,11 +9,7 @@ function defaultFactory(virtualRoot) {
       create: function create() {
         var i;
         var shallowCopy = virtualRoot.domNode.cloneNode(false);
-
-        // Since we are too generic, use inefficient DOM api to update attributes
-        virtualRoot.bind(model, function (name, newValue) {
-          shallowCopy.setAttributeNS(null, name, newValue);
-        });
+        virtualRoot.bind(model, shallowCopy);
 
         var children = virtualRoot.children;
         for (i = 0; i < children.length; ++i) {

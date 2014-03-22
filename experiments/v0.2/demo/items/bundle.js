@@ -152,56 +152,49 @@ module.exports = virtualNode;
 var BINDING_EXPR = /{{(.+?)}}/;
 
 function virtualNode(domNode, virtualChildren, bindingGroup) {
+  var bindingRules;
+
   return {
     children: virtualChildren,
     bind: bind,
+    bindRule: bindRule,
     domNode: domNode
   };
 
-  function bind(attributeName, model, valueChanged) {
+  function bindRule(attributeName, valueChangedFactory) {
+    if (!bindingRules) bindingRules = Object.create(null);
+    bindingRules[attributeName] = valueChangedFactory;
+  }
+
+  function bind(model, target) {
     if (!domNode.attributes) return; // this might be a text. need to figure out what to do in that case
 
-    if (arguments.length === 3) {
-      bindConcreateAttribute(attributeName, model, valueChanged);
-    } else {
-      bindAllAttributes(attributeName, model);
+    var attrs = domNode.attributes;
+    for (var i = 0; i < attrs.length; ++i) {
+      bindDomAttribute(attrs[i], model, target);
     }
   }
 
-  function bindConcreateAttribute(attributeName, model, valueChanged) {
-    var attr = domNode.attributes[attributeName] || domNode.attributes['_' + attributeName];
-    if (!attr) return; // no such attribute on dom node
-
-    var value = attr.value;
-    if (!value) return; // Unary attribute?
+  function bindDomAttribute(domAttribute, model, target) {
+    var value = domAttribute.value;
+    if (!value) return; // unary attribute?
 
     var modelNameMatch = value.match(BINDING_EXPR);
-    if (!modelNameMatch) return; // Attribute found, does not look like a binding
+    if (!modelNameMatch) return; // does not look like a binding
+
+    var attrName = domAttribute.localName;
+    if (attrName[0] === '_') attrName = attrName.substr(1);
+
+    var valueChanged = (bindingRules[attrName] || universalRule)(target, attrName);
 
     bindingGroup.createBinding(modelNameMatch[1], model, valueChanged);
   }
-
-  function bindAllAttributes(model, valueChanged) {
-    var attrs = domNode.attributes;
-    for (var i = 0; i < attrs.length; ++i) {
-      bindDomAttribute(attrs[i], model, bindingGroup, valueChanged);
-    }
-  }
 }
 
-function bindDomAttribute(domAttribute, model, bindingGroup, valueChanged) {
-  var value = domAttribute.value;
-  if (!value) return;
-
-  var modelNameMatch = value.match(BINDING_EXPR);
-  if (!modelNameMatch) return;
-
-  // this is really inefficient, clients should override this with concrete bindings:
-  var attrName = domAttribute.localName;
-  if (attrName[0] === '_') attrName = attrName.substr(1);
-  bindingGroup.createBinding(modelNameMatch[1], model, function (newValue) {
-    valueChanged(attrName, newValue);
-  });
+function universalRule(element, attrName) {
+  return function (newValue) {
+    element.setAttributeNS(null, attrName, newValue);
+  };
 }
 
 },{}],7:[function(require,module,exports){
@@ -216,11 +209,7 @@ function defaultFactory(virtualRoot) {
       create: function create() {
         var i;
         var shallowCopy = virtualRoot.domNode.cloneNode(false);
-
-        // Since we are too generic, use inefficient DOM api to update attributes
-        virtualRoot.bind(model, function (name, newValue) {
-          shallowCopy.setAttributeNS(null, name, newValue);
-        });
+        virtualRoot.bind(model, shallowCopy);
 
         var children = virtualRoot.children;
         for (i = 0; i < children.length; ++i) {
@@ -255,39 +244,56 @@ module.exports.createTag = function createTag(name, factory) {
 var createTag = require('./index').createTag;
 
 createTag('circle', function (virtual) {
+  // Define optimized binding rules for circle:
+  virtual.bindRule('cx', sizeRule('cx'));
+  virtual.bindRule('cy', sizeRule('cy'));
+  virtual.bindRule('r', sizeRule('r'));
+
   return function (model) {
     return {
       create: function () {
         var circle = virtual.domNode.cloneNode(false);
-
-        virtual.bind('cx', model, function (x) { circle.cx.baseVal.value = x; });
-        virtual.bind('cy', model, function (y) { circle.cy.baseVal.value = y; });
-        virtual.bind('r', model, function (r) { circle.r.baseVal.value = r; });
-
+        virtual.bind(model, circle);
         return circle;
       }
     };
   };
 });
 
-createTag('items', function (virtual){
+/**
+ * Creates optimized binding for SVGSize attribute
+ */
+function sizeRule (attr) {
+  return function (element) {
+    return function (newValue) {
+      element[attr].baseVal.value = newValue;
+    };
+  };
+}
+
+createTag('items', function (itemsTag) {
+  itemsTag.bindRule('source', itemsSourceRule);
+
   return function itemsControl(model) {
     return {
       create: function () {
         var g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-        var template = virtual.children[0];
 
-        virtual.bind('source', model, function (newValue) {
-          for (var i = 0; i < newValue.length; ++i) {
-            var child = template(newValue[i]).create();
-            g.appendChild(child);
-          }
-        });
+        itemsTag.bind(model, { g: g, template: itemsTag.children[0]});
 
         return g;
       }
     };
   };
+
+  function itemsSourceRule(itemsControl) {
+    return function (newValue) {
+      for (var i = 0; i < newValue.length; ++i) {
+        var child = itemsControl.template(newValue[i]).create();
+        itemsControl.g.appendChild(child);
+      }
+    };
+  }
 });
 
 },{"./index":8}],10:[function(require,module,exports){
