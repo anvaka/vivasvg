@@ -10,10 +10,10 @@ function defaultFactory(virtualRoot) {
         var i;
         var shallowCopy = virtualRoot.domNode.cloneNode(false);
 
-        var attributes = virtualRoot.attributes;
-        for (var name in attributes) {
-          monitorAttribute(attributes[name], shallowCopy, model);
-        }
+        // Since we are too generic, use inefficient DOM api to update attributes
+        virtualRoot.bind(model, function (name, newValue) {
+          shallowCopy.setAttributeNS(null, name, newValue);
+        });
 
         var children = virtualRoot.children;
         for (i = 0; i < children.length; ++i) {
@@ -25,10 +25,3 @@ function defaultFactory(virtualRoot) {
     };
   };
 }
-
-function monitorAttribute(attribute, domElement, model) {
-  attribute.observe(model, function (newValue) {
-    domElement.setAttributeNS(null, attribute.name, newValue);
-  });
-}
-

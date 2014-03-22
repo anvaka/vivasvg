@@ -29,7 +29,7 @@ function createViewModel(count) {
   });
 }
 
-},{"../../vivasvg":9}],2:[function(require,module,exports){
+},{"../../vivasvg":10}],2:[function(require,module,exports){
 module.exports = function app(dom, context) {
   var bindingGroup = require('./binding/bindingGroup')();
   var virtualDom = require('./compile/compile')(dom, bindingGroup);
@@ -71,7 +71,7 @@ function bindingGroup() {
     updateTargets: updateTargets
   };
 
-  function createBinding(setter, propertyName, viewModel) {
+  function createBinding(propertyName, viewModel, setter) {
     var binding = {
       isDirty: false,
       set : setter,
@@ -120,8 +120,10 @@ function viewModel(rawObject) {
     for (var i = 0; i < arguments.length; ++i) {
       var propertyName = arguments[i];
       var callbacks = boundProperties[propertyName];
-      for (var j = 0; j < callbacks.length; ++j) {
-        callbacks[j](rawObject[propertyName]);
+      if (callbacks) {
+        for (var j = 0; j < callbacks.length; ++j) {
+          callbacks[j](rawObject[propertyName]);
+        }
       }
     }
   };
@@ -137,7 +139,7 @@ function viewModel(rawObject) {
 module.exports = compile;
 
 var tagLib = require('../tags/');
-var BINDING_EXPR = /{{(.+?)}}/;
+var createVirtualNode = require('./virtualNode');
 
 function compile(domNode, bindingGroup) {
   if (domNode.nodeType !== 1) return; // todo: how about text nodes?
@@ -150,48 +152,78 @@ function compile(domNode, bindingGroup) {
       if (virtualChild) virtualChildren.push(virtualChild);
     }
   }
+
   var tagFactory = tagLib.getTag(domNode.localName);
-  return tagFactory({
-    children: virtualChildren,
-    attributes: compileAttributes(domNode, bindingGroup),
-    domNode: domNode
-  });
+  var virtualNode = createVirtualNode(domNode, virtualChildren, bindingGroup);
+
+  return tagFactory(virtualNode);
 }
 
-function compileAttributes(domNode, bindingGroup) {
-  var observableAttributes = Object.create(null);
-  var attributes = domNode.attributes;
-  if (attributes) {
-    for (i = 0; i < attributes.length; ++i) {
-      var attr = attributes[i];
-      var observable = createObservableAttribute(attr, bindingGroup);
-      if (observable) {
-        observableAttributes[observable.name] = observable;
-      }
+
+},{"../tags/":8,"./virtualNode":6}],6:[function(require,module,exports){
+/**
+ * Each dom element gets a special 'virtual node' assigned to it. This helps
+ * custom tags to bind to data model, and inspect its own children
+ */
+
+module.exports = virtualNode;
+
+var BINDING_EXPR = /{{(.+?)}}/;
+
+function virtualNode(domNode, virtualChildren, bindingGroup) {
+  return {
+    children: virtualChildren,
+    bind: bind,
+    domNode: domNode
+  };
+
+  function bind(attributeName, model, valueChanged) {
+    if (!domNode.attributes) return; // this might be a text. need to figure out what to do in that case
+
+    if (arguments.length === 3) {
+      bindConcreateAttribute(attributeName, model, valueChanged);
+    } else {
+      bindAllAttributes(attributeName, model);
     }
   }
 
-  return observableAttributes;
-}
+  function bindConcreateAttribute(attributeName, model, valueChanged) {
+    var attr = domNode.attributes[attributeName] || domNode.attributes['_' + attributeName];
+    if (!attr) return; // no such attribute on dom node
 
-function createObservableAttribute(attribute, bindingGroup) {
-  var value = attribute.value;
-  var propertyMatch = value.match(BINDING_EXPR);
-  if (!propertyMatch) return;
+    var value = attr.value;
+    if (!value) return; // Unary attribute?
 
-  var name = attribute.localName;
-  if (name[0] === '_') name = name.substr(1);
-  var propertyName = propertyMatch[1];
+    var modelNameMatch = value.match(BINDING_EXPR);
+    if (!modelNameMatch) return; // Attribute found, does not look like a binding
 
-  return {
-    name: name,
-    observe: function (viewModel, valueChanged) {
-      bindingGroup.createBinding(valueChanged, propertyName, viewModel);
+    bindingGroup.createBinding(modelNameMatch[1], model, valueChanged);
+  }
+
+  function bindAllAttributes(model, valueChanged) {
+    var attrs = domNode.attributes;
+    for (var i = 0; i < attrs.length; ++i) {
+      bindDomAttribute(attrs[i], model, bindingGroup, valueChanged);
     }
-  };
+  }
 }
 
-},{"../tags/":7}],6:[function(require,module,exports){
+function bindDomAttribute(domAttribute, model, bindingGroup, valueChanged) {
+  var value = domAttribute.value;
+  if (!value) return;
+
+  var modelNameMatch = value.match(BINDING_EXPR);
+  if (!modelNameMatch) return;
+
+  // this is really inefficient, clients should override this with concrete bindings:
+  var attrName = domAttribute.localName;
+  if (attrName[0] === '_') attrName = attrName.substr(1);
+  bindingGroup.createBinding(modelNameMatch[1], model, function (newValue) {
+    valueChanged(attrName, newValue);
+  });
+}
+
+},{}],7:[function(require,module,exports){
 /**
  * If compiler does not know how to compile a tag it will fallback to this method.
  */
@@ -204,10 +236,10 @@ function defaultFactory(virtualRoot) {
         var i;
         var shallowCopy = virtualRoot.domNode.cloneNode(false);
 
-        var attributes = virtualRoot.attributes;
-        for (var name in attributes) {
-          monitorAttribute(attributes[name], shallowCopy, model);
-        }
+        // Since we are too generic, use inefficient DOM api to update attributes
+        virtualRoot.bind(model, function (name, newValue) {
+          shallowCopy.setAttributeNS(null, name, newValue);
+        });
 
         var children = virtualRoot.children;
         for (i = 0; i < children.length; ++i) {
@@ -220,14 +252,7 @@ function defaultFactory(virtualRoot) {
   };
 }
 
-function monitorAttribute(attribute, domElement, model) {
-  attribute.observe(model, function (newValue) {
-    domElement.setAttributeNS(null, attribute.name, newValue);
-  });
-}
-
-
-},{}],7:[function(require,module,exports){
+},{}],8:[function(require,module,exports){
 var defaultFactory = require('./default');
 var knownTags = Object.create(null);
 
@@ -240,7 +265,7 @@ module.exports.createTag = function createTag(name, factory) {
   knownTags[name] = factory;
 };
 
-},{"./default":6}],8:[function(require,module,exports){
+},{"./default":7}],9:[function(require,module,exports){
 var createTag = require('./index').createTag;
 
 createTag('circle', function (virtual) {
@@ -248,16 +273,11 @@ createTag('circle', function (virtual) {
     return {
       create: function () {
         var circle = virtual.domNode.cloneNode(false);
-        var cx = virtual.attributes.cx;
-        if (cx) {
-          var acx = circle.cx.baseVal;
-          cx.observe(model, function (newValue) { acx.value = newValue; });
-        }
-        var cy = virtual.attributes.cy;
-        if (cy) {
-          var acy = circle.cy.baseVal;
-          cy.observe(model, function (newValue) { acy.value = newValue; });
-        }
+
+        debugger;
+        virtual.bind('cx', model, function (newValue) { circle.cx.baseVal.value = newValue; });
+        virtual.bind('cy', model, function (newValue) { circle.cy.baseVal.value = newValue; });
+
         return circle;
       }
     };
@@ -265,17 +285,17 @@ createTag('circle', function (virtual) {
 });
 
 createTag('items', function (virtual){
-  return function (model) {
+  return function itemsControl(model) {
     return {
       create: function () {
         var g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
         var template = virtual.children[0];
-        var itemsSource = virtual.attributes.source;
 
-        itemsSource.observe(model, function (newValue) {
+        debugger;
+        virtual.bind('source', model, function (newValue) {
           for (var i = 0; i < newValue.length; ++i) {
-            var model = newValue[i];
-            g.appendChild(template(model).create());
+            var child = template(newValue[i]).create();
+            g.appendChild(child);
           }
         });
 
@@ -285,12 +305,12 @@ createTag('items', function (virtual){
   };
 });
 
-},{"./index":7}],9:[function(require,module,exports){
+},{"./index":8}],10:[function(require,module,exports){
 require('./lib/tags/standard');
 
 module.exports.app = require('./lib/app');
 module.exports.viewModel = require('./lib/binding/viewModel');
 module.exports.createTag = require('./lib/tags/').createTag;
 
-},{"./lib/app":2,"./lib/binding/viewModel":4,"./lib/tags/":7,"./lib/tags/standard":8}]},{},[1])
+},{"./lib/app":2,"./lib/binding/viewModel":4,"./lib/tags/":8,"./lib/tags/standard":9}]},{},[1])
 ;

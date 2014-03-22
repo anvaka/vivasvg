@@ -22,7 +22,7 @@ function bindingGroup() {
     updateTargets: updateTargets
   };
 
-  function createBinding(setter, propertyName, viewModel) {
+  function createBinding(propertyName, viewModel, setter) {
     var binding = {
       isDirty: false,
       set : setter,

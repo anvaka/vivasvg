@@ -16,8 +16,10 @@ function viewModel(rawObject) {
     for (var i = 0; i < arguments.length; ++i) {
       var propertyName = arguments[i];
       var callbacks = boundProperties[propertyName];
-      for (var j = 0; j < callbacks.length; ++j) {
-        callbacks[j](rawObject[propertyName]);
+      if (callbacks) {
+        for (var j = 0; j < callbacks.length; ++j) {
+          callbacks[j](rawObject[propertyName]);
+        }
       }
     }
   };
