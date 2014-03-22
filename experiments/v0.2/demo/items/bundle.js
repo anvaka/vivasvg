@@ -45,7 +45,7 @@ function createViewModel(count) {
 module.exports = function app(dom, context) {
   var bindingGroup = require('./binding/bindingGroup')();
   var virtualDom = require('./compile/compile')(dom, bindingGroup);
-  var newDom = virtualDom(context).create();
+  var newDom = virtualDom.create(context);
   dom.parentNode.replaceChild(newDom, dom);
 
   return {
@@ -204,21 +204,19 @@ function universalRule(element, attrName) {
 module.exports = defaultFactory;
 
 function defaultFactory(virtualRoot) {
-  return function (model) {
-    return {
-      create: function create() {
-        var i;
-        var shallowCopy = virtualRoot.domNode.cloneNode(false);
-        virtualRoot.bind(model, shallowCopy);
+  return {
+    create: function create(model) {
+      var i;
+      var shallowCopy = virtualRoot.domNode.cloneNode(false);
+      virtualRoot.bind(model, shallowCopy);
 
-        var children = virtualRoot.children;
-        for (i = 0; i < children.length; ++i) {
-          shallowCopy.appendChild(children[i](model).create());
-        }
-
-        return shallowCopy;
+      var children = virtualRoot.children;
+      for (i = 0; i < children.length; ++i) {
+        shallowCopy.appendChild(children[i].create(model));
       }
-    };
+
+      return shallowCopy;
+    }
   };
 }
 
@@ -249,14 +247,12 @@ createTag('circle', function (virtual) {
   virtual.bindRule('cy', sizeRule('cy'));
   virtual.bindRule('r', sizeRule('r'));
 
-  return function (model) {
-    return {
-      create: function () {
-        var circle = virtual.domNode.cloneNode(false);
-        virtual.bind(model, circle);
-        return circle;
-      }
-    };
+  return {
+    create: function (model) {
+      var circle = virtual.domNode.cloneNode(false);
+      virtual.bind(model, circle);
+      return circle;
+    }
   };
 });
 
@@ -274,22 +270,20 @@ function sizeRule (attr) {
 createTag('items', function (itemsTag) {
   itemsTag.bindRule('source', itemsSourceRule);
 
-  return function itemsControl(model) {
-    return {
-      create: function () {
-        var g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  return {
+    create: function (model) {
+      var g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
 
-        itemsTag.bind(model, { g: g, template: itemsTag.children[0]});
+      itemsTag.bind(model, { g: g, template: itemsTag.children[0]});
 
-        return g;
-      }
-    };
+      return g;
+    }
   };
 
   function itemsSourceRule(itemsControl) {
     return function (newValue) {
       for (var i = 0; i < newValue.length; ++i) {
-        var child = itemsControl.template(newValue[i]).create();
+        var child = itemsControl.template.create(newValue[i]);
         itemsControl.g.appendChild(child);
       }
     };

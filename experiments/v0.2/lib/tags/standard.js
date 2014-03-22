@@ -6,14 +6,12 @@ createTag('circle', function (virtual) {
   virtual.bindRule('cy', sizeRule('cy'));
   virtual.bindRule('r', sizeRule('r'));
 
-  return function (model) {
-    return {
-      create: function () {
-        var circle = virtual.domNode.cloneNode(false);
-        virtual.bind(model, circle);
-        return circle;
-      }
-    };
+  return {
+    create: function (model) {
+      var circle = virtual.domNode.cloneNode(false);
+      virtual.bind(model, circle);
+      return circle;
+    }
   };
 });
 
@@ -31,22 +29,20 @@ function sizeRule (attr) {
 createTag('items', function (itemsTag) {
   itemsTag.bindRule('source', itemsSourceRule);
 
-  return function itemsControl(model) {
-    return {
-      create: function () {
-        var g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  return {
+    create: function (model) {
+      var g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
 
-        itemsTag.bind(model, { g: g, template: itemsTag.children[0]});
+      itemsTag.bind(model, { g: g, template: itemsTag.children[0]});
 
-        return g;
-      }
-    };
+      return g;
+    }
   };
 
   function itemsSourceRule(itemsControl) {
     return function (newValue) {
       for (var i = 0; i < newValue.length; ++i) {
-        var child = itemsControl.template(newValue[i]).create();
+        var child = itemsControl.template.create(newValue[i]);
         itemsControl.g.appendChild(child);
       }
     };
