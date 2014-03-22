@@ -8,12 +8,16 @@ var tagLib = require('../tags/');
 var BINDING_EXPR = /{{(.+?)}}/;
 
 function compile(domNode, bindingGroup) {
-  var virtualChildren = [];
-  var domChildren = domNode.children;
-  for (var i = 0; i < domChildren.length; ++i) {
-    virtualChildren.push(compile(domChildren[i], bindingGroup));
-  }
+  if (domNode.nodeType !== 1) return; // todo: how about text nodes?
 
+  var virtualChildren = [];
+  if (domNode.hasChildNodes()) {
+    var domChildren = domNode.childNodes;
+    for (var i = 0; i < domChildren.length; ++i) {
+      var virtualChild = compile(domChildren[i], bindingGroup);
+      if (virtualChild) virtualChildren.push(virtualChild);
+    }
+  }
   var tagFactory = tagLib.getTag(domNode.localName);
   return tagFactory({
     children: virtualChildren,
@@ -25,11 +29,14 @@ function compile(domNode, bindingGroup) {
 function compileAttributes(domNode, bindingGroup) {
   var observableAttributes = Object.create(null);
   var attributes = domNode.attributes;
-
-  for (i = 0; i < attributes.length; ++i) {
-    var attr = attributes[i];
-    var observable = createObservableAttribute(attr, bindingGroup);
-    if (observable) observableAttributes[observable.name] = observable;
+  if (attributes) {
+    for (i = 0; i < attributes.length; ++i) {
+      var attr = attributes[i];
+      var observable = createObservableAttribute(attr, bindingGroup);
+      if (observable) {
+        observableAttributes[observable.name] = observable;
+      }
+    }
   }
 
   return observableAttributes;
