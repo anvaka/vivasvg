@@ -6,8 +6,9 @@ createTag('circle', function (virtual) {
       create: function () {
         var circle = virtual.domNode.cloneNode(false);
 
-        virtual.bind('cx', model, function (newValue) { circle.cx.baseVal.value = newValue; });
-        virtual.bind('cy', model, function (newValue) { circle.cy.baseVal.value = newValue; });
+        virtual.bind('cx', model, function (x) { circle.cx.baseVal.value = x; });
+        virtual.bind('cy', model, function (y) { circle.cy.baseVal.value = y; });
+        virtual.bind('r', model, function (r) { circle.r.baseVal.value = r; });
 
         return circle;
       }

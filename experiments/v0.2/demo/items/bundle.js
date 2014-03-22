@@ -253,8 +253,13 @@ function defaultFactory(virtualRoot) {
 }
 
 },{}],8:[function(require,module,exports){
-var defaultFactory = require('./default');
+/**
+ * Tag library provides a way to register new dom tags
+ */
 var knownTags = Object.create(null);
+
+// Default factory is used when requested tag is not known.
+var defaultFactory = require('./default');
 
 module.exports.getTag = function getTag(tagName) {
   return knownTags[tagName] || defaultFactory;
@@ -274,9 +279,9 @@ createTag('circle', function (virtual) {
       create: function () {
         var circle = virtual.domNode.cloneNode(false);
 
-        debugger;
-        virtual.bind('cx', model, function (newValue) { circle.cx.baseVal.value = newValue; });
-        virtual.bind('cy', model, function (newValue) { circle.cy.baseVal.value = newValue; });
+        virtual.bind('cx', model, function (x) { circle.cx.baseVal.value = x; });
+        virtual.bind('cy', model, function (y) { circle.cy.baseVal.value = y; });
+        virtual.bind('r', model, function (r) { circle.r.baseVal.value = r; });
 
         return circle;
       }
@@ -291,7 +296,6 @@ createTag('items', function (virtual){
         var g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
         var template = virtual.children[0];
 
-        debugger;
         virtual.bind('source', model, function (newValue) {
           for (var i = 0; i < newValue.length; ++i) {
             var child = template(newValue[i]).create();
