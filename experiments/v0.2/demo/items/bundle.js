@@ -23,19 +23,22 @@ function createViewModel(count) {
     viewModels.push(vivasvg.viewModel(ball));
   }
 
-  // Start animation loop (yes, outside of RAF, this is totally OK):
-  setInterval(function () {
+  render();
+
+  return vivasvg.viewModel({
+    circles: viewModels
+  });
+
+  function render() {
+    requestAnimationFrame(render);
+
     for (var i = 0; i < viewModels.length; ++i) {
       model = viewModels[i];
       model.x += model.dx; if (model.x < 0 || model.x > 640 ) { model.dx *= -1; model.x += model.dx; }
       model.y += model.dy; if (model.y < 0 || model.y > 480 ) { model.dy *= -1; model.y += model.dy; }
       model.invalidate('x', 'y');
     }
-  }, 1000/60);
-
-  return vivasvg.viewModel({
-    circles: viewModels
-  });
+  }
 }
 
 },{"../../vivasvg":10}],2:[function(require,module,exports){
@@ -50,8 +53,6 @@ module.exports = function app(dom, context) {
   };
 
   function run() {
-    requestAnimationFrame(run);
-    bindingGroup.updateTargets();
   }
 };
 
@@ -69,44 +70,14 @@ module.exports = function app(dom, context) {
  */
 module.exports = bindingGroup;
 
-var BINDING_EXPR = /{{(.+?)}}/;
-
 function bindingGroup() {
-  var dirtyBindings = [];
-  var dirtyLength = 0;
-
   return {
     createBinding: createBinding,
-    updateTargets: updateTargets
   };
 
   function createBinding(propertyName, viewModel, setter) {
-    var binding = {
-      isDirty: false,
-      set : setter,
-      source: undefined
-    };
-
-    viewModel.bind(propertyName, function (value) {
-      binding.source = value;
-
-      if (binding.isDirty) return; // already in the queue.
-      binding.isDirty = true;
-      dirtyBindings[dirtyLength++] = binding;
-    });
-
+    viewModel.bind(propertyName, setter);
     viewModel.invalidate(propertyName);
-  }
-
-  function updateTargets() {
-    if (!dirtyLength) return;
-    for (var i = 0; i < dirtyLength; ++i) {
-      var binding = dirtyBindings[i];
-      binding.set(binding.source);
-      binding.isDirty = false;
-    }
-
-    dirtyLength = 0;
   }
 }
 
@@ -126,6 +97,7 @@ function viewModel(rawObject) {
   };
 
   rawObject.invalidate = function () {
+    // todo this should somehow be executed inside raf
     for (var i = 0; i < arguments.length; ++i) {
       var propertyName = arguments[i];
       var callbacks = boundProperties[propertyName];

@@ -13,6 +13,7 @@ function viewModel(rawObject) {
   };
 
   rawObject.invalidate = function () {
+    // todo this should somehow be executed inside raf
     for (var i = 0; i < arguments.length; ++i) {
       var propertyName = arguments[i];
       var callbacks = boundProperties[propertyName];

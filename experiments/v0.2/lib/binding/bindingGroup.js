@@ -11,43 +11,13 @@
  */
 module.exports = bindingGroup;
 
-var BINDING_EXPR = /{{(.+?)}}/;
-
 function bindingGroup() {
-  var dirtyBindings = [];
-  var dirtyLength = 0;
-
   return {
     createBinding: createBinding,
-    updateTargets: updateTargets
   };
 
   function createBinding(propertyName, viewModel, setter) {
-    var binding = {
-      isDirty: false,
-      set : setter,
-      source: undefined
-    };
-
-    viewModel.bind(propertyName, function (value) {
-      binding.source = value;
-
-      if (binding.isDirty) return; // already in the queue.
-      binding.isDirty = true;
-      dirtyBindings[dirtyLength++] = binding;
-    });
-
+    viewModel.bind(propertyName, setter);
     viewModel.invalidate(propertyName);
-  }
-
-  function updateTargets() {
-    if (!dirtyLength) return;
-    for (var i = 0; i < dirtyLength; ++i) {
-      var binding = dirtyBindings[i];
-      binding.set(binding.source);
-      binding.isDirty = false;
-    }
-
-    dirtyLength = 0;
   }
 }

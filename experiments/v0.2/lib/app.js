@@ -9,7 +9,5 @@ module.exports = function app(dom, context) {
   };
 
   function run() {
-    requestAnimationFrame(run);
-    bindingGroup.updateTargets();
   }
 };

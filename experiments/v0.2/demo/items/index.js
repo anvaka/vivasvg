@@ -22,17 +22,20 @@ function createViewModel(count) {
     viewModels.push(vivasvg.viewModel(ball));
   }
 
-  // Start animation loop (yes, outside of RAF, this is totally OK):
-  setInterval(function () {
+  render();
+
+  return vivasvg.viewModel({
+    circles: viewModels
+  });
+
+  function render() {
+    requestAnimationFrame(render);
+
     for (var i = 0; i < viewModels.length; ++i) {
       model = viewModels[i];
       model.x += model.dx; if (model.x < 0 || model.x > 640 ) { model.dx *= -1; model.x += model.dx; }
       model.y += model.dy; if (model.y < 0 || model.y > 480 ) { model.dy *= -1; model.y += model.dy; }
       model.invalidate('x', 'y');
     }
-  }, 1000/60);
-
-  return vivasvg.viewModel({
-    circles: viewModels
-  });
+  }
 }
