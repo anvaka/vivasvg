@@ -1,4 +1,4 @@
-;(function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);throw new Error("Cannot find module '"+o+"'")}var f=n[o]={exports:{}};t[o][0].call(f.exports,function(e){var n=t[o][1][e];return s(n?n:e)},f,f.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+(function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);throw new Error("Cannot find module '"+o+"'")}var f=n[o]={exports:{}};t[o][0].call(f.exports,function(e){var n=t[o][1][e];return s(n?n:e)},f,f.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
 var vivasvg = require('../../vivasvg');
 var countMatch = window.location.href.match(/q=(\d+)/);
 var count = (countMatch && countMatch[1]) || 100;
@@ -152,18 +152,18 @@ module.exports = virtualNode;
 var BINDING_EXPR = /{{(.+?)}}/;
 
 function virtualNode(domNode, virtualChildren, bindingGroup) {
-  var bindingRules;
+  var attributeRules;
 
   return {
     children: virtualChildren,
     bind: bind,
-    bindRule: bindRule,
+    attribute: attribute,
     domNode: domNode
   };
 
-  function bindRule(attributeName, valueChangedFactory) {
-    if (!bindingRules) bindingRules = Object.create(null);
-    bindingRules[attributeName] = valueChangedFactory;
+  function attribute(attributeName, valueChangedFactory) {
+    if (!attributeRules) attributeRules = Object.create(null);
+    attributeRules[attributeName] = valueChangedFactory;
   }
 
   function bind(model, target) {
@@ -185,7 +185,7 @@ function virtualNode(domNode, virtualChildren, bindingGroup) {
     var attrName = domAttribute.localName;
     if (attrName[0] === '_') attrName = attrName.substr(1);
 
-    var valueChanged = (bindingRules[attrName] || universalRule)(target, attrName);
+    var valueChanged = (attributeRules[attrName] || universalRule)(target, attrName);
 
     bindingGroup.createBinding(modelNameMatch[1], model, valueChanged);
   }
@@ -243,9 +243,9 @@ var createTag = require('./index').createTag;
 
 createTag('circle', function (virtual) {
   // Define optimized binding rules for circle:
-  virtual.bindRule('cx', sizeRule('cx'));
-  virtual.bindRule('cy', sizeRule('cy'));
-  virtual.bindRule('r', sizeRule('r'));
+  virtual.attribute('cx', sizeRule('cx'));
+  virtual.attribute('cy', sizeRule('cy'));
+  virtual.attribute('r', sizeRule('r'));
 
   return {
     create: function (model) {
@@ -268,7 +268,7 @@ function sizeRule (attr) {
 }
 
 createTag('items', function (itemsTag) {
-  itemsTag.bindRule('source', itemsSourceRule);
+  itemsTag.attribute('source', itemsSourceRule);
 
   return {
     create: function (model) {
@@ -298,4 +298,3 @@ module.exports.viewModel = require('./lib/binding/viewModel');
 module.exports.createTag = require('./lib/tags/').createTag;
 
 },{"./lib/app":2,"./lib/binding/viewModel":4,"./lib/tags/":8,"./lib/tags/standard":9}]},{},[1])
-;

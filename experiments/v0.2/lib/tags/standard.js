@@ -2,9 +2,9 @@ var createTag = require('./index').createTag;
 
 createTag('circle', function (virtual) {
   // Define optimized binding rules for circle:
-  virtual.bindRule('cx', sizeRule('cx'));
-  virtual.bindRule('cy', sizeRule('cy'));
-  virtual.bindRule('r', sizeRule('r'));
+  virtual.attribute('cx', sizeRule('cx'));
+  virtual.attribute('cy', sizeRule('cy'));
+  virtual.attribute('r', sizeRule('r'));
 
   return {
     create: function (model) {
@@ -27,7 +27,7 @@ function sizeRule (attr) {
 }
 
 createTag('items', function (itemsTag) {
-  itemsTag.bindRule('source', itemsSourceRule);
+  itemsTag.attribute('source', itemsSourceRule);
 
   return {
     create: function (model) {

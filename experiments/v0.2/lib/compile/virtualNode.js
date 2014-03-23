@@ -8,18 +8,18 @@ module.exports = virtualNode;
 var BINDING_EXPR = /{{(.+?)}}/;
 
 function virtualNode(domNode, virtualChildren, bindingGroup) {
-  var bindingRules;
+  var attributeRules;
 
   return {
     children: virtualChildren,
     bind: bind,
-    bindRule: bindRule,
+    attribute: attribute,
     domNode: domNode
   };
 
-  function bindRule(attributeName, valueChangedFactory) {
-    if (!bindingRules) bindingRules = Object.create(null);
-    bindingRules[attributeName] = valueChangedFactory;
+  function attribute(attributeName, valueChangedFactory) {
+    if (!attributeRules) attributeRules = Object.create(null);
+    attributeRules[attributeName] = valueChangedFactory;
   }
 
   function bind(model, target) {
@@ -41,7 +41,7 @@ function virtualNode(domNode, virtualChildren, bindingGroup) {
     var attrName = domAttribute.localName;
     if (attrName[0] === '_') attrName = attrName.substr(1);
 
-    var valueChanged = (bindingRules[attrName] || universalRule)(target, attrName);
+    var valueChanged = (attributeRules[attrName] || universalRule)(target, attrName);
 
     bindingGroup.createBinding(modelNameMatch[1], model, valueChanged);
   }
