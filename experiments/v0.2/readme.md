@@ -10,51 +10,45 @@ Each dom node maps to a custom object. E.g. consider an example:
 </svg>
 ```
 
-Our compiler traverses the tree and finds constructor functions:
+Our compiler traverses the tree and for each node constructs a `context`. Context is a thin wrapper over node, which allows developers to create new tags and work with data-bound attributes.
+
+`items` tag instantiates dom nodes for each element in the source collection. Here is how it can be implemented:
 
 ``` js
-function svg() {}
-function items() {}
-function circle() {}
-```
+createTag('items', function (context) {
+  // context allows developers to react on dom attributes.
+  // We want to update our dom children, based on `source` attribute:
+  context.attribute('source', itemsSourceAttr); 
 
-These functions create virtual DOM (thin wrappers other dom nodes), and provide extension
-points for custom elements (e.g. `items`).
+  return {
+    // this method creates new instance of real dom node, with desired behavior:
+    create: function (model) {
+      // in svg `g` is a group of elements:
+      var g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
 
-Each virtual dom element should have standard lifecycle:
+      // now we tell context to bind to a model. Second argument is passed to itemsSourceAttr
+      context.bind(model, { 
+        g: g, 
+        template: context.children[0] // context gives us access to child
+      });
 
-* Append to dom
-* Remove from dom
+      return g;
+    }
+  };
 
-For example, how can we implement `items()`?
-
-``` js
-function items(virtualRoot) {
-  var itemTemplate = virtualRoot.children[0]; // first element is an item template
-  var attributes = virtualRoot.attributes;
-
-  // this is our thin wrapper:
-  return function (model) {
-    return {
-      create: function () {
-        var g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-        parent.appendChild(g);
-        // listen to data items source changes:
-        attributes.source.observe(model, {
-          add: function (model) {
-            // and add dom elements when source collection changed
-            var child = itemTemplate(model);
-            g.appendChild(child.create());
-          }
-        });
-
-        return g;
+  function itemsSourceAttr(itemsControl) {
+    // itemsControl is that second argument from context.bind() - see above.
+    
+    return function (newValue) {
+      // this function will be called when source value is changed. Assuming it's a collection
+      // let's iterate over each element, and construct dom nodes:
+      for (var i = 0; i < newValue.length; ++i) {
+        var child = itemsControl.template.create(newValue[i]);
+        itemsControl.g.appendChild(child);
       }
     };
   }
-}
+});
 ```
-
-This may look a bit wordy, but it's only a prototype, 32 lines and we have `ng-repeat`-like tag
 
 [# Demo](https://anvaka.github.io/vivasvg/experiments/v0.2/demo/items/?q=1000)
