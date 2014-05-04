@@ -2,8 +2,6 @@ var vivasvg = require('../../vivasvg');
 var countMatch = window.location.href.match(/q=(\d+)/);
 var count = (countMatch && countMatch[1]) || 100;
 var svgApp = vivasvg.app(document.getElementById('scene'), createViewModel(count));
-svgApp.run();
-
 
 function createViewModel(count) {
   var viewModels = [];

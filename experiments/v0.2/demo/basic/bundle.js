@@ -1,9 +1,8 @@
-;(function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);throw new Error("Cannot find module '"+o+"'")}var f=n[o]={exports:{}};t[o][0].call(f.exports,function(e){var n=t[o][1][e];return s(n?n:e)},f,f.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+(function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);throw new Error("Cannot find module '"+o+"'")}var f=n[o]={exports:{}};t[o][0].call(f.exports,function(e){var n=t[o][1][e];return s(n?n:e)},f,f.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
 var vivasvg = require('../../vivasvg');
 
 var dataContext = vivasvg.viewModel({x: 320, y: 240});
 var app = vivasvg.app(document.getElementById('scene'), dataContext);
-app.run();
 
 setInterval(function () {
   dataContext.x += Math.random() * 8 - 4;
@@ -13,77 +12,13 @@ setInterval(function () {
 
 },{"../../vivasvg":9}],2:[function(require,module,exports){
 module.exports = function app(dom, context) {
-  var bindingGroup = require('./binding/bindingGroup')();
-  var virtualDom = require('./compile/compile')(dom, bindingGroup);
-  var newDom = virtualDom(context).create();
-  dom.parentNode.replaceChild(newDom, dom);
-
-  return {
-    run: run
-  };
-
-  function run() {
-    requestAnimationFrame(run);
-    bindingGroup.updateTargets();
-  }
+  var virtualDom = require('./compile/compile')(dom);
+  var newDom = virtualDom.create(context);
+  var parent = dom.parentNode;
+  parent.replaceChild(newDom, dom);
 };
 
-},{"./binding/bindingGroup":3,"./compile/compile":5}],3:[function(require,module,exports){
-/**
- * Binding group holds collection of bindings. Main reason why binding group
- * exists is to provide delayed update of binding targets.
- *
- * When binding source notifies a binding object about change, binding object
- * may not immediately update target. All updates should happen within
- * one call inside RequestAnimationFrame callback to optimize rendering performance
- *
- * Thus each binding object marks itself as dirty when source changes, and
- * registers itself within binding group for update when possible.
- */
-module.exports = bindingGroup;
-
-var BINDING_EXPR = /{{(.+?)}}/;
-
-function bindingGroup() {
-  var dirtyBindings = [];
-  var dirtyLength = 0;
-
-  return {
-    createBinding: createBinding,
-    updateTargets: updateTargets
-  };
-
-  function createBinding(setter, propertyName, viewModel) {
-    var binding = {
-      isDirty: false,
-      set : setter,
-      source: undefined
-    };
-
-    viewModel.bind(propertyName, function (value) {
-      binding.source = value;
-
-      if (binding.isDirty) return; // already in the queue.
-      binding.isDirty = true;
-      dirtyBindings[dirtyLength++] = binding;
-    });
-
-    viewModel.invalidate(propertyName);
-  }
-
-  function updateTargets() {
-    if (!dirtyLength) return;
-    for (var i = 0; i < dirtyLength; ++i) {
-      var binding = dirtyBindings[i];
-      binding.set(binding.source);
-      binding.isDirty = false;
-    }
-
-    dirtyLength = 0;
-  }
-}
-
-},{}],4:[function(require,module,exports){
+},{"./compile/compile":4}],3:[function(require,module,exports){
 
 module.exports = viewModel;
 
@@ -99,11 +34,14 @@ function viewModel(rawObject) {
   };
 
   rawObject.invalidate = function () {
+    // todo this should somehow be executed inside raf
     for (var i = 0; i < arguments.length; ++i) {
       var propertyName = arguments[i];
       var callbacks = boundProperties[propertyName];
-      for (var j = 0; j < callbacks.length; ++j) {
-        callbacks[j](rawObject[propertyName]);
+      if (callbacks) {
+        for (var j = 0; j < callbacks.length; ++j) {
+          callbacks[j](rawObject[propertyName]);
+        }
       }
     }
   };
@@ -111,7 +49,7 @@ function viewModel(rawObject) {
   return rawObject;
 }
 
-},{}],5:[function(require,module,exports){
+},{}],4:[function(require,module,exports){
 /**
  * Compiler traverses dom tree and produces virtual dom, which later
  * can be injected with data context and rendered/appended to any parent
@@ -119,95 +57,120 @@ function viewModel(rawObject) {
 module.exports = compile;
 
 var tagLib = require('../tags/');
+var createVirtualNode = require('./virtualNode');
+
+function compile(domNode) {
+  if (domNode.nodeType !== 1) return; // todo: how about text nodes?
+
+  // first we collect virtual children
+  var virtualChildren = [];
+  if (domNode.hasChildNodes()) {
+    var domChildren = domNode.childNodes;
+    for (var i = 0; i < domChildren.length; ++i) {
+      var virtualChild = compile(domChildren[i]);
+      if (virtualChild) virtualChildren.push(virtualChild);
+    }
+  }
+
+  // then we instantiate current node,
+  var tagFactory = tagLib.getTag(domNode.localName);
+  var virtualNode = createVirtualNode(domNode, virtualChildren);
+
+  return tagFactory(virtualNode);
+}
+
+
+},{"../tags/":7,"./virtualNode":5}],5:[function(require,module,exports){
+/**
+ * Each dom element gets a special 'virtual node' assigned to it. This helps
+ * custom tags to bind to data model, and inspect its own children
+ */
+
+module.exports = virtualNode;
+
 var BINDING_EXPR = /{{(.+?)}}/;
 
-function compile(domNode, bindingGroup) {
-  var virtualChildren = [];
-  var domChildren = domNode.children;
-  for (var i = 0; i < domChildren.length; ++i) {
-    virtualChildren.push(compile(domChildren[i], bindingGroup));
-  }
-
-  var tagFactory = tagLib.getTag(domNode.localName);
-  return tagFactory({
-    children: virtualChildren,
-    attributes: compileAttributes(domNode, bindingGroup),
-    domNode: domNode
-  });
-}
-
-function compileAttributes(domNode, bindingGroup) {
-  var observableAttributes = Object.create(null);
-  var attributes = domNode.attributes;
-
-  for (i = 0; i < attributes.length; ++i) {
-    var attr = attributes[i];
-    var observable = createObservableAttribute(attr, bindingGroup);
-    if (observable) observableAttributes[observable.name] = observable;
-  }
-
-  return observableAttributes;
-}
-
-function createObservableAttribute(attribute, bindingGroup) {
-  var value = attribute.value;
-  var propertyMatch = value.match(BINDING_EXPR);
-  if (!propertyMatch) return;
-
-  var name = attribute.localName;
-  if (name[0] === '_') name = name.substr(1);
-  var propertyName = propertyMatch[1];
+function virtualNode(domNode, virtualChildren) {
+  var attributeRules;
 
   return {
-    name: name,
-    observe: function (viewModel, valueChanged) {
-      bindingGroup.createBinding(valueChanged, propertyName, viewModel);
+    children: virtualChildren,
+    bind: bind,
+    attribute: attribute,
+    domNode: domNode
+  };
+
+  function attribute(attributeName, valueChangedFactory) {
+    if (!attributeRules) attributeRules = Object.create(null);
+    attributeRules[attributeName] = valueChangedFactory;
+  }
+
+  function bind(model, target) {
+    if (!domNode.attributes) return; // this might be a text. need to figure out what to do in that case
+
+    var attrs = domNode.attributes;
+    for (var i = 0; i < attrs.length; ++i) {
+      bindDomAttribute(attrs[i], model, target);
     }
+  }
+
+  function bindDomAttribute(domAttribute, model, target) {
+    var value = domAttribute.value;
+    if (!value) return; // unary attribute?
+
+    var modelNameMatch = value.match(BINDING_EXPR);
+    if (!modelNameMatch) return; // does not look like a binding
+
+    var attrName = domAttribute.localName;
+    if (attrName[0] === '_') attrName = attrName.substr(1);
+
+    var valueChanged = (attributeRules[attrName] || universalRule)(target, attrName);
+
+    model.bind(modelNameMatch[1], valueChanged);
+    model.invalidate(modelNameMatch[1]);
+  }
+}
+
+function universalRule(element, attrName) {
+  return function (newValue) {
+    element.setAttributeNS(null, attrName, newValue);
   };
 }
 
-},{"../tags/":7}],6:[function(require,module,exports){
+},{}],6:[function(require,module,exports){
 /**
  * If compiler does not know how to compile a tag it will fallback to this method.
  */
 module.exports = defaultFactory;
 
 function defaultFactory(virtualRoot) {
-  return function (model) {
-    return {
-      create: function create() {
-        var i;
-        var shallowCopy = virtualRoot.domNode.cloneNode(false);
+  return {
+    create: function create(model) {
+      var i;
+      var shallowCopy = virtualRoot.domNode.cloneNode(false);
+      virtualRoot.bind(model, shallowCopy);
 
-        var attributes = virtualRoot.attributes;
-        for (var name in attributes) {
-          monitorAttribute(attributes[name], shallowCopy, model);
-        }
-
-        var children = virtualRoot.children;
-        for (i = 0; i < children.length; ++i) {
-          shallowCopy.appendChild(children[i](model).create());
-        }
-
-        return shallowCopy;
+      var children = virtualRoot.children;
+      for (i = 0; i < children.length; ++i) {
+        shallowCopy.appendChild(children[i].create(model));
       }
-    };
+
+      return shallowCopy;
+    }
   };
 }
 
-function monitorAttribute(attribute, domElement, model) {
-  attribute.observe(model, function (newValue) {
-    domElement.setAttributeNS(null, attribute.name, newValue);
-  });
-}
-
-
 },{}],7:[function(require,module,exports){
-var defaultFactory = require('./default');
+/**
+ * Tag library provides a way to register new dom tags
+ */
 var knownTags = Object.create(null);
 
+// Default factory is used when requested tag is not known.
+var defaultTag = require('./default');
+
 module.exports.getTag = function getTag(tagName) {
-  return knownTags[tagName] || defaultFactory;
+  return knownTags[tagName] || defaultTag;
 };
 
 module.exports.createTag = function createTag(name, factory) {
@@ -219,45 +182,52 @@ module.exports.createTag = function createTag(name, factory) {
 var createTag = require('./index').createTag;
 
 createTag('circle', function (virtual) {
-  return function (model) {
-    return {
-      create: function () {
-        var circle = virtual.domNode.cloneNode(false);
-        var cx = virtual.attributes.cx;
-        if (cx) {
-          var acx = circle.cx.baseVal;
-          cx.observe(model, function (newValue) { acx.value = newValue; });
-        }
-        var cy = virtual.attributes.cy;
-        if (cy) {
-          var acy = circle.cy.baseVal;
-          cy.observe(model, function (newValue) { acy.value = newValue; });
-        }
-        return circle;
-      }
-    };
+  // Define optimized binding rules for circle:
+  virtual.attribute('cx', sizeRule('cx'));
+  virtual.attribute('cy', sizeRule('cy'));
+  virtual.attribute('r', sizeRule('r'));
+
+  return {
+    create: function (model) {
+      var circle = virtual.domNode.cloneNode(false);
+      virtual.bind(model, circle);
+      return circle;
+    }
   };
 });
 
-createTag('items', function (virtual){
-  return function (model) {
-    return {
-      create: function () {
-        var g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-        var template = virtual.children[0];
-        var itemsSource = virtual.attributes.items;
-
-        itemsSource.observe(model, function (newValue) {
-          for (var i = 0; i < newValue.length; ++i) {
-            var model = newValue[i];
-            g.appendChild(template(model).create());
-          }
-        });
-
-        return g;
-      }
+/**
+ * Creates optimized binding for SVGSize attribute
+ */
+function sizeRule (attr) {
+  return function (element) {
+    return function (newValue) {
+      element[attr].baseVal.value = newValue;
     };
   };
+}
+
+createTag('items', function (itemsTag) {
+  itemsTag.attribute('source', itemsSourceRule);
+
+  return {
+    create: function (model) {
+      var g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+
+      itemsTag.bind(model, { g: g, template: itemsTag.children[0]});
+
+      return g;
+    }
+  };
+
+  function itemsSourceRule(itemsControl) {
+    return function (newValue) {
+      for (var i = 0; i < newValue.length; ++i) {
+        var child = itemsControl.template.create(newValue[i]);
+        itemsControl.g.appendChild(child);
+      }
+    };
+  }
 });
 
 },{"./index":7}],9:[function(require,module,exports){
@@ -267,5 +237,4 @@ module.exports.app = require('./lib/app');
 module.exports.viewModel = require('./lib/binding/viewModel');
 module.exports.createTag = require('./lib/tags/').createTag;
 
-},{"./lib/app":2,"./lib/binding/viewModel":4,"./lib/tags/":7,"./lib/tags/standard":8}]},{},[1])
-;
+},{"./lib/app":2,"./lib/binding/viewModel":3,"./lib/tags/":7,"./lib/tags/standard":8}]},{},[1])

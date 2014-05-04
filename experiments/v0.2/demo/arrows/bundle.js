@@ -4,7 +4,7 @@ var vivasvg = require('../../vivasvg');
 vivasvg.createTag('arrow', function (arrowTag) {
   arrowTag.attribute('from', fromRule);
   arrowTag.attribute('to', toRule);
-  arrowTag.attribute('stroke', strokeRule);
+  // TODO: how do I add defs?
 
   return {
     create: function (model) {
@@ -34,25 +34,7 @@ function toRule(arrowPath) {
   };
 }
 
-function strokeRule(arrowPath) {
-  return function (newValue) {
-    debugger;
-    ensureArrowDefRegistered(arrowPath, newValue);
-    arrowPath.setAttributeNS(null, 'stroke', newValue);
-  };
-}
-
-function ensureArrowDefRegistered(path, color) {
-  // we need to add defs to the svg root
-  var ownerDocument = path.ownerSVGElement;
-  var defId = 'ArrowTriangle' + color;
-  if (ownerDocument && !ownerDocument[defId]) {
-    ownerDocument.addDef('<marker id="' + defId + '" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="strokeWidth" markerWidth="10" markerHeight="5" orient="auto" style="fill: ' + color + '"><path d="M 0 0 L 10 5 L 0 10 z"></path></marker>');
-    ownerDocument[defId] = true; // todo: should be better way
-  }
-}
-
-},{"../../vivasvg":13}],2:[function(require,module,exports){
+},{"../../vivasvg":12}],2:[function(require,module,exports){
 module.exports = ArrowModel;
 
 function ArrowModel() {
@@ -130,48 +112,15 @@ function createArrows(n) {
   return arrows;
 }
 
-},{"../../vivasvg":13,"./arrowTag":1,"./data/arrowModel":2,"./data/mousePos":3}],5:[function(require,module,exports){
+},{"../../vivasvg":12,"./arrowTag":1,"./data/arrowModel":2,"./data/mousePos":3}],5:[function(require,module,exports){
 module.exports = function app(dom, context) {
-  var bindingGroup = require('./binding/bindingGroup')();
-  var virtualDom = require('./compile/compile')(dom, bindingGroup);
+  var virtualDom = require('./compile/compile')(dom);
   var newDom = virtualDom.create(context);
   var parent = dom.parentNode;
   parent.replaceChild(newDom, dom);
-
-  return {
-    run: run
-  };
-
-  function run() {
-  }
 };
 
-},{"./binding/bindingGroup":6,"./compile/compile":8}],6:[function(require,module,exports){
-/**
- * Binding group holds collection of bindings. Main reason why binding group
- * exists is to provide delayed update of binding targets.
- *
- * When binding source notifies a binding object about change, binding object
- * may not immediately update target. All updates should happen within
- * one call inside RequestAnimationFrame callback to optimize rendering performance
- *
- * Thus each binding object marks itself as dirty when source changes, and
- * registers itself within binding group for update when possible.
- */
-module.exports = bindingGroup;
-
-function bindingGroup() {
-  return {
-    createBinding: createBinding,
-  };
-
-  function createBinding(propertyName, viewModel, setter) {
-    viewModel.bind(propertyName, setter);
-    viewModel.invalidate(propertyName);
-  }
-}
-
-},{}],7:[function(require,module,exports){
+},{"./compile/compile":7}],6:[function(require,module,exports){
 
 module.exports = viewModel;
 
@@ -202,7 +151,7 @@ function viewModel(rawObject) {
   return rawObject;
 }
 
-},{}],8:[function(require,module,exports){
+},{}],7:[function(require,module,exports){
 /**
  * Compiler traverses dom tree and produces virtual dom, which later
  * can be injected with data context and rendered/appended to any parent
@@ -212,26 +161,28 @@ module.exports = compile;
 var tagLib = require('../tags/');
 var createVirtualNode = require('./virtualNode');
 
-function compile(domNode, bindingGroup) {
+function compile(domNode) {
   if (domNode.nodeType !== 1) return; // todo: how about text nodes?
 
+  // first we collect virtual children
   var virtualChildren = [];
   if (domNode.hasChildNodes()) {
     var domChildren = domNode.childNodes;
     for (var i = 0; i < domChildren.length; ++i) {
-      var virtualChild = compile(domChildren[i], bindingGroup);
+      var virtualChild = compile(domChildren[i]);
       if (virtualChild) virtualChildren.push(virtualChild);
     }
   }
 
+  // then we instantiate current node,
   var tagFactory = tagLib.getTag(domNode.localName);
-  var virtualNode = createVirtualNode(domNode, virtualChildren, bindingGroup);
+  var virtualNode = createVirtualNode(domNode, virtualChildren);
 
   return tagFactory(virtualNode);
 }
 
 
-},{"../tags/":11,"./virtualNode":9}],9:[function(require,module,exports){
+},{"../tags/":10,"./virtualNode":8}],8:[function(require,module,exports){
 /**
  * Each dom element gets a special 'virtual node' assigned to it. This helps
  * custom tags to bind to data model, and inspect its own children
@@ -241,7 +192,7 @@ module.exports = virtualNode;
 
 var BINDING_EXPR = /{{(.+?)}}/;
 
-function virtualNode(domNode, virtualChildren, bindingGroup) {
+function virtualNode(domNode, virtualChildren) {
   var attributeRules;
 
   return {
@@ -277,7 +228,8 @@ function virtualNode(domNode, virtualChildren, bindingGroup) {
 
     var valueChanged = (attributeRules[attrName] || universalRule)(target, attrName);
 
-    bindingGroup.createBinding(modelNameMatch[1], model, valueChanged);
+    model.bind(modelNameMatch[1], valueChanged);
+    model.invalidate(modelNameMatch[1]);
   }
 }
 
@@ -287,7 +239,7 @@ function universalRule(element, attrName) {
   };
 }
 
-},{}],10:[function(require,module,exports){
+},{}],9:[function(require,module,exports){
 /**
  * If compiler does not know how to compile a tag it will fallback to this method.
  */
@@ -310,17 +262,17 @@ function defaultFactory(virtualRoot) {
   };
 }
 
-},{}],11:[function(require,module,exports){
+},{}],10:[function(require,module,exports){
 /**
  * Tag library provides a way to register new dom tags
  */
 var knownTags = Object.create(null);
 
 // Default factory is used when requested tag is not known.
-var defaultFactory = require('./default');
+var defaultTag = require('./default');
 
 module.exports.getTag = function getTag(tagName) {
-  return knownTags[tagName] || defaultFactory;
+  return knownTags[tagName] || defaultTag;
 };
 
 module.exports.createTag = function createTag(name, factory) {
@@ -328,7 +280,7 @@ module.exports.createTag = function createTag(name, factory) {
   knownTags[name] = factory;
 };
 
-},{"./default":10}],12:[function(require,module,exports){
+},{"./default":9}],11:[function(require,module,exports){
 var createTag = require('./index').createTag;
 
 createTag('circle', function (virtual) {
@@ -380,11 +332,11 @@ createTag('items', function (itemsTag) {
   }
 });
 
-},{"./index":11}],13:[function(require,module,exports){
+},{"./index":10}],12:[function(require,module,exports){
 require('./lib/tags/standard');
 
 module.exports.app = require('./lib/app');
 module.exports.viewModel = require('./lib/binding/viewModel');
 module.exports.createTag = require('./lib/tags/').createTag;
 
-},{"./lib/app":5,"./lib/binding/viewModel":7,"./lib/tags/":11,"./lib/tags/standard":12}]},{},[4])
+},{"./lib/app":5,"./lib/binding/viewModel":6,"./lib/tags/":10,"./lib/tags/standard":11}]},{},[4])

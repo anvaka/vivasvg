@@ -2,7 +2,6 @@ var vivasvg = require('../../vivasvg');
 
 var dataContext = vivasvg.viewModel({x: 320, y: 240});
 var app = vivasvg.app(document.getElementById('scene'), dataContext);
-app.run();
 
 setInterval(function () {
   dataContext.x += Math.random() * 8 - 4;

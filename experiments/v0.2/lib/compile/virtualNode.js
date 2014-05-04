@@ -7,7 +7,7 @@ module.exports = virtualNode;
 
 var BINDING_EXPR = /{{(.+?)}}/;
 
-function virtualNode(domNode, virtualChildren, bindingGroup) {
+function virtualNode(domNode, virtualChildren) {
   var attributeRules;
 
   return {
@@ -43,7 +43,8 @@ function virtualNode(domNode, virtualChildren, bindingGroup) {
 
     var valueChanged = (attributeRules[attrName] || universalRule)(target, attrName);
 
-    bindingGroup.createBinding(modelNameMatch[1], model, valueChanged);
+    model.bind(modelNameMatch[1], valueChanged);
+    model.invalidate(modelNameMatch[1]);
   }
 }
 
