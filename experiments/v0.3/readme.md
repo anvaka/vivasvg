@@ -68,12 +68,7 @@ Here is how it could be implemented:
 createTag('items', function (itemsTag) {
   // Let's define a new attribute for `items` tag:
   itemsTag.attribute('source', sourceAttributeChanged);
-
-  // Define method to create actual DOM node:
-  itemsTag.create(function createDOM() {
-    // in svg `g` is a group of elements:
-    return document.createElementNS('http://www.w3.org/2000/svg', 'g');
-  });
+  itemsTag.template('<g></g>');
 
   function sourceAttributeChanged(target) {
     var template = target.children[0]; // store into closure for quick access
@@ -126,11 +121,7 @@ vivasvg.createTag('arrow', function (arrowTag) {
   arrowTag.attribute('from', fromChanged);
   arrowTag.attribute('to', toChanged);
   arrowTag.attribute('stroke', strokeChanged);
-
-  arrowTag.create(function createDOM() {
-    var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    return path;
-  });
+  arrowTag.template('<path></path>');
 
   function fromChanged(arrow) {
     var fromSeg = arrow.dom.createSVGPathSegMovetoAbs(0, 0);
