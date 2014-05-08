@@ -70,12 +70,10 @@ createTag('items', function (itemsTag) {
   itemsTag.attribute('source', sourceAttributeChanged);
 
   // Define method to create actual DOM node:
-  itemsTag.create(createDOM);
-
-  function createDOM() {
+  itemsTag.create(function createDOM() {
     // in svg `g` is a group of elements:
     return document.createElementNS('http://www.w3.org/2000/svg', 'g');
-  }
+  });
 
   function sourceAttributeChanged(target) {
     var template = target.children[0]; // store into closure for quick access
