@@ -192,3 +192,14 @@ vivasvg.createTag('arrow', function (arrowTag) {
   }
 });
 ```
+
+This is a lot of code. It does solve complex problem though: SVG does not currently
+support easier way of inheriting color for markers from referencing elements.
+This [will be fixed in SVG 2.0](http://www.w3.org/TR/SVG2/painting.html#VertexMarkerProperties)
+but now solution is too verbose.
+
+Good news however, once developers have created this arrow tag, they can easily
+share it with rest of the world via `npm`.
+
+Tag libraries can be published as regular npm modules, and developers can consume
+it via regular `require` call.
