@@ -37,7 +37,7 @@ This is a simple hello world application
 
 ``` html
 <svg xmlns='http://www.w3.org/2000/svg'>
-  <circle cx='{{x}}' cy='{{y}}' r='10'></circle>
+  <circle _cx='{{x}}' _cy='{{y}}' r='10'></circle>
 </svg>
 ```
 
@@ -65,23 +65,129 @@ a template:
 Here is how it could be implemented:
 
 ``` js
-createTag('items', function (virtualNode) {
+createTag('items', function (itemsTag) {
   // Let's define a new attribute for `items` tag:
-  virtualNode.attribute('source', sourceAttributeChanged);
+  itemsTag.attribute('source', sourceAttributeChanged);
 
   // Define method to create actual DOM node:
-  virtualNode.create(createDOM);
+  itemsTag.create(createDOM);
 
-  function createDOM(model) {
+  function createDOM() {
     // in svg `g` is a group of elements:
     return document.createElementNS('http://www.w3.org/2000/svg', 'g');
   }
 
-  function sourceAttributeChanged(target, sourceValue) {
-    var template = target.children[0];
-    // we assume sourceValue is a collection
-    for (var i = 0; i < sourceValue.length; ++i) {
-      target.addChild(template.create(sourceValue[i]));
+  function sourceAttributeChanged(target) {
+    var template = target.children[0]; // store into closure for quick access
+
+    return function (sourceValue) {
+      // we assume sourceValue is a collection
+      for (var i = 0; i < sourceValue.length; ++i) {
+        target.addChild(template.create(sourceValue[i]));
+      }
+    };
+  }
+});
+```
+
+## Arrow
+
+Arrows are not supported in SVG by default. To create a simple arrow in regular
+SVG developers have to use `markers` and `defs`, this is how SVG works:
+
+
+``` html
+<svg xmlns='http://www.w3.org/2000/svg'>
+  <path d='M 10 10 L 42 42' stroke='gray' marker-end='url(#Triangle)'></path>
+  <defs>
+    <marker id="Triangle"
+            viewBox="0 0 10 10"
+            refX="8" refY="5"
+            markerUnits="strokeWidth"
+            markerWidth="10" markerHeight="5"
+            orient="auto" style="fill: gray">
+      <path d="M 0 0 L 10 5 L 0 10 z"></path>
+    </marker>
+  </defs>
+</svg>
+```
+
+This will render a simple arrow from point `(10, 10)` to `(42, 42)`. With vivasvg
+you can create a tag to simplify it:
+
+``` html
+<svg xmlns='http://www.w3.org/2000/svg'>
+  <arrow from='10 10' to='42 42' stroke='gray'></arrow>
+</svg>
+```
+
+This is how `arrow` tag could be implemented:
+
+``` js
+vivasvg.createTag('arrow', function (arrowTag) {
+  arrowTag.attribute('from', fromChanged);
+  arrowTag.attribute('to', toChanged);
+  arrowTag.attribute('stroke', strokeChanged);
+
+  itemsTag.create(function createDOM() {
+    var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    return path;
+  });
+
+  function fromChanged(arrow) {
+    var fromSeg = arrow.dom.createSVGPathSegMovetoAbs(0, 0);
+    arrow.dom.pathSegList.appendItem(fromSeg);
+
+    return function (newValue) {
+      fromSeg.x = newValue.x;
+      fromSeg.y = newValue.y;
+    };
+  }
+
+  function toChanged(arrow) {
+    var toSeg = arrow.dom.createSVGPathSegLinetoAbs(0, 0);
+    arrow.dom.pathSegList.appendItem(toSeg);
+
+    return function (newValue) {
+      toSeg.x = newValue.x;
+      toSeg.y = newValue.y;
+    };
+  }
+
+  function strokeChanged(arrow) {
+    // stroke is interesting, since it requires corresponding `defs` in the svg root.
+    // We will store registered strokes in javascript map, to avoid calls to dom:
+    var registeredStrokes = Object.create(null);
+    var dom = arrow.dom;
+
+    return function (newValue) {
+      // assuming newValue will be a color.
+      var defKey = registered[newValue];
+      // if color is not yet seen, register new def entry:
+      if (!defKey) defKey = registerNewMarker(newValue);
+
+      // finally set attributes on path itself:
+      dom.setAttributeNS(null, 'stroke', newValue);
+      dom.setAttributeNS(null, 'marker-end', 'url(#' + defKey + ')');
+    };
+
+    function registerNewMarker(color) {
+      var id = 'triangle' + color;
+      registeredMarkers[color] = id;
+
+      // boring dom manipulation to create actual `defs > marker` tag
+      var defs = getDefs(dom.ownerSVGElement);
+      vivasvg.appendTo(defs, [
+        '<marker id="' + id + '" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="strokeWidth"',
+        '        markerWidth="10" markerHeight="5" orient="auto"',
+        '        style="fill: "' + color + '>',
+        '  <path d="M 0 0 L 10 5 L 0 10 z"></path>',
+        '</marker>'].join('\n');
+    });
+
+    function getDefs(svgRoot) {
+      return svgRoot.getElementsByTagName('defs')[0] ||
+             vivasvg.appendTo(svgRoot, '<defs></defs>');
     }
   }
 });
