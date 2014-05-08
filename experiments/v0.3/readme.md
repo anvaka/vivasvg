@@ -129,7 +129,7 @@ vivasvg.createTag('arrow', function (arrowTag) {
   arrowTag.attribute('to', toChanged);
   arrowTag.attribute('stroke', strokeChanged);
 
-  itemsTag.create(function createDOM() {
+  arrowTag.create(function createDOM() {
     var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     return path;
   });
