@@ -156,13 +156,13 @@ vivasvg.createTag('arrow', function (arrowTag) {
 
   function strokeChanged(arrow) {
     // stroke is interesting, since it requires corresponding `defs` in the svg root.
-    // We will store registered strokes in javascript map, to avoid calls to dom:
-    var registeredStrokes = Object.create(null);
+    // We will store registered markers in javascript map, to avoid calls to dom:
+    var registeredMarkers = Object.create(null);
     var dom = arrow.dom;
 
     return function (newValue) {
       // assuming newValue will be a color.
-      var defKey = registered[newValue];
+      var defKey = registeredMarkers[newValue];
       // if color is not yet seen, register new def entry:
       if (!defKey) defKey = registerNewMarker(newValue);
 
@@ -202,4 +202,4 @@ Good news however, once developers have created this arrow tag, they can easily
 share it with rest of the world via `npm`.
 
 Tag libraries can be published as regular npm modules, and developers can consume
-it via regular `require` call.
+them via regular `require` call.
