@@ -70,13 +70,13 @@ createTag('items', function (itemsTag) {
   itemsTag.attribute('source', sourceAttributeChanged);
   itemsTag.template('<g></g>');
 
-  function sourceAttributeChanged(target) {
-    var template = target.children[0]; // store into closure for quick access
+  function sourceAttributeChanged(tagInstance) {
+    var itemTemplate = tagInstance.children[0]; // store into closure for quick access
 
     return function (sourceValue) {
       // we assume sourceValue is a collection
       for (var i = 0; i < sourceValue.length; ++i) {
-        target.addChild(template.create(sourceValue[i]));
+        tagInstance.addChild(itemTemplate.create(sourceValue[i]));
       }
     };
   }
