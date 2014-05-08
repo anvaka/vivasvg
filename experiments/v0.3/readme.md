@@ -31,6 +31,23 @@ Virtual node allows developers to create new tags and work with data-bound attri
 
 This is a collection of possible use cases. Keep in mind this is only a theory.
 
+## Hello world
+
+This is a simple hello world application
+
+``` html
+<svg xmlns='http://www.w3.org/2000/svg'>
+  <circle cx='{{x}}' cy='{{y}}' r='10'></circle>
+</svg>
+```
+
+It will render a circle at `x`, `y` coordinates, which are coming from data context.
+Data context is passed to vivasvg during application bootstrap:
+
+``` js
+  vivasvg.bootstrap(svgElement, {x: 42, y: 42});
+```
+
 ## Items control
 
 Items control allows developers to iterate over source colection and render with
