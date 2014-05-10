@@ -48,52 +48,97 @@ Data context is passed to vivasvg during application bootstrap:
   vivasvg.bootstrap(svgElement, {x: 42, y: 42});
 ```
 
-## Items control
+## SVG component
 
-Items control allows developers to iterate over source colection and render with
-a template:
+Library allows you to reuse complex SVG markup in just one tag:
 
 ``` html
 <svg xmlns='http://www.w3.org/2000/svg'>
-  <items source='{{circles}}'>
-    <circle cx='{{x}}' cy='{{y}}' r='1'></circle>
-  </items>
+  <tiger></tiger>
 </svg>
 ```
 
-`items` tag instantiates dom nodes for each element in the source collection.
-Here is how it could be implemented:
+This code should render a famous [svg tiger](http://commons.wikimedia.org/wiki/File:Ghostscript_Tiger.svg).
+This is how the `tiger` tag is created:
 
 ``` js
-createTag('items', function (itemsTag) {
-  itemsTag.template('<g></g>');
-});
+var createTag = require('vivasvg').createTag;
+var tigerMarkup = require('fs').readFileSync('./tiger.svg', 'utf8');
+createTag('tiger', tigerMarkup);
+```
 
-createAttribute('items', 'source', function (itemsTag) {
-  var itemTemplate = items.originalContent();
+`createTag` registers a new tag `tiger`, and provides a markup which will replace
+original tag.
+
+Let's add support to change fill color:
+
+``` html
+<svg xmlns='http://www.w3.org/2000/svg'>
+  <tiger fill='orange'></tiger>
+  <tiger fill='deepskyblue'></tiger>
+</svg>
+```
+
+To accomplish this goal, we can provide a custom function to generate markup:
+
+``` js
+createTag('tiger', function(tag) {
+  var markup = require('fs').readFileSync('./tiger.svg', 'utf8');
+  var customFill = tag.attributes('fill');
+
+  if (customFill) markup.replace(/#cc7226/g, customFill);
+
+  // provide new template with replaced color
+  tag.template(markup);
+});
+```
+
+## Items source
+
+Items source allows developers to generate repeatable content. E.g. this:
+
+``` html
+<svg xmlns='http://www.w3.org/2000/svg'>
+  <g items-source='[{x: 1, y: 1}, {x: 2, y: 2}]'>
+    <circle cx='{{x}}' cy='{{y}}' r='1'></circle>
+  </g>
+</svg>
+```
+
+Is transformed to this:
+
+``` html
+<svg xmlns='http://www.w3.org/2000/svg'>
+  <g>
+    <circle cx='1' cy='1' r='1'></circle>
+    <circle cx='2' cy='2' r='1'></circle>
+  </g>
+</svg>
+```
+
+`items-source` attribute adds new behavior to standard `g` tag. For each item in the
+underlying model collection it instantiates a new DOM element:
+
+``` js
+createAttribute('items-source', function (tag) {
+  // grab content of a tag and treat it as item template:
+  var itemTemplate = tag.children();
+  tag.empty();
 
   return function changedCallback(sourceValue) {
     // we assume sourceValue is a collection
     for (var i = 0; i < sourceValue.length; ++i) {
-      items.addChild(itemTemplate.clone(sourceValue[i]));
+      var child = itemTemplate.clone(sourceValue[i]);
+      tag.addChild(child);
     }
   };
-}
-);
-```
-
-`items` tag simply redefines template, and will insert svg group instead of itself.
-Shortcut for it could be:
-
-```
-createTag('items', '<g></g>');
+});
 ```
 
 ## Arrow
 
 Arrows are not supported in SVG by default. To create a simple arrow in regular
-SVG developers have to use `markers` and `defs`, this is how SVG works:
-
+SVG developers have to use `markers` and `defs`:
 
 ``` html
 <svg xmlns='http://www.w3.org/2000/svg'>
@@ -116,69 +161,66 @@ you can create a tag to simplify it:
 
 ``` html
 <svg xmlns='http://www.w3.org/2000/svg'>
-  <arrow from='10 10' to='42 42' stroke='gray'></arrow>
+  <arrow from='{x: 10, y: 10}' to='{x: 42, y: 42}' stroke='gray'></arrow>
 </svg>
 ```
 
 This is how `arrow` tag could be implemented:
 
 ``` js
-vivasvg.createTag('arrow', function (arrowTag) {
-  arrowTag.attribute('from', fromChanged);
-  arrowTag.attribute('to', toChanged);
-  arrowTag.attribute('stroke', strokeChanged);
-  arrowTag.template('<path></path>');
+createTag('arrow', '<path></path>');
 
-  function fromChanged(arrow) {
-    var fromSeg = arrow.dom.createSVGPathSegMovetoAbs(0, 0);
-    arrow.dom.pathSegList.appendItem(fromSeg);
+// create new attributes and limit their scope to `arrow` tag only:
+createAttribute('arrow', 'from', function (tag) {
+  // using SVG javascript api instead of DOM api is much faster:
+  var fromSeg = tag.dom.createSVGPathSegMovetoAbs(0, 0);
+  tag.dom.pathSegList.appendItem(fromSeg);
 
-    return function (newValue) {
-      fromSeg.x = newValue.x;
-      fromSeg.y = newValue.y;
-    };
-  }
+  return function (newValue) {
+    fromSeg.x = newValue.x;
+    fromSeg.y = newValue.y;
+  };
+});
 
-  function toChanged(arrow) {
-    var toSeg = arrow.dom.createSVGPathSegLinetoAbs(0, 0);
-    arrow.dom.pathSegList.appendItem(toSeg);
+createAttribute('arrow', 'to', function (tag) {
+  var toSeg = tag.dom.createSVGPathSegLinetoAbs(0, 0);
+  tag.dom.pathSegList.appendItem(toSeg);
 
-    return function (newValue) {
-      toSeg.x = newValue.x;
-      toSeg.y = newValue.y;
-    };
-  }
+  return function (newValue) {
+    toSeg.x = newValue.x;
+    toSeg.y = newValue.y;
+  };
+});
 
-  function strokeChanged(arrow) {
-    // stroke is interesting, since it requires corresponding `defs` in the svg root.
+// stroke is interesting, since it requires to update `defs` on the svg root.
+createAttribute('arrow', 'stroke', function (tag) {
     // We will store registered markers in javascript map, to avoid calls to dom:
     var registeredMarkers = Object.create(null);
-    var dom = arrow.dom;
+    var dom = tag.dom;
 
-    return function (newValue) {
-      // assuming newValue will be a color.
-      var defKey = registeredMarkers[newValue];
+    return function (newColor) {
+      var defKey = registeredMarkers[newColor];
       // if color is not yet seen, register new def entry:
-      if (!defKey) defKey = registerNewMarker(newValue);
+      if (!defKey) defKey = registerNewMarker(newColor);
 
       // finally set attributes on path itself:
-      dom.setAttributeNS(null, 'stroke', newValue);
+      dom.setAttributeNS(null, 'stroke', newColor);
       dom.setAttributeNS(null, 'marker-end', 'url(#' + defKey + ')');
     };
 
+    // boring dom manipulation to create actual `defs > marker` tag
     function registerNewMarker(color) {
       var id = 'triangle' + color;
       registeredMarkers[color] = id;
 
-      // boring dom manipulation to create actual `defs > marker` tag
       var defs = getDefs(dom.ownerSVGElement);
       vivasvg.appendTo(defs, [
         '<marker id="' + id + '" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="strokeWidth"',
         '        markerWidth="10" markerHeight="5" orient="auto"',
         '        style="fill: "' + color + '>',
         '  <path d="M 0 0 L 10 5 L 0 10 z"></path>',
-        '</marker>'].join('\n');
-    });
+        '</marker>'].join('\n'));
+    }
 
     function getDefs(svgRoot) {
       return svgRoot.getElementsByTagName('defs')[0] ||
