@@ -66,21 +66,20 @@ Here is how it could be implemented:
 
 ``` js
 createTag('items', function (itemsTag) {
-  // Let's define a new attribute for `items` tag:
-  itemsTag.attribute('source', sourceAttributeChanged);
   itemsTag.template('<g></g>');
-
-  function sourceAttributeChanged(items) {
-    var itemTemplate = items.children[0]; // store into closure for quick access
-
-    return function (sourceValue) {
-      // we assume sourceValue is a collection
-      for (var i = 0; i < sourceValue.length; ++i) {
-        items.addChild(itemTemplate.create(sourceValue[i]));
-      }
-    };
-  }
 });
+
+createAttribute('items', 'source', function (itemsTag) {
+  var itemTemplate = items.originalContent();
+
+  return function changedCallback(sourceValue) {
+    // we assume sourceValue is a collection
+    for (var i = 0; i < sourceValue.length; ++i) {
+      items.addChild(itemTemplate.clone(sourceValue[i]));
+    }
+  };
+}
+);
 ```
 
 ## Arrow
