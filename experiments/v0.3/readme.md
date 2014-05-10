@@ -239,3 +239,16 @@ share it with rest of the world via `npm`.
 
 Tag libraries can be published as regular npm modules, and developers can consume
 them via regular `require` call.
+
+## Lifecycle
+
+Lifecycle of a tag can be accessed via event listeners.
+
+``` js
+createAttribute('monitor', function(tag) {
+  tag.attached(function () { console.log('attached to dom')});
+  tag.detached(function () { console.log('detached from dom')});
+});
+```
+
+
