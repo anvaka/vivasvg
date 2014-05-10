@@ -194,38 +194,37 @@ createAttribute('arrow', 'to', function (tag) {
 
 // stroke is interesting, since it requires to update `defs` on the svg root.
 createAttribute('arrow', 'stroke', function (tag) {
-    // We will store registered markers in javascript map, to avoid calls to dom:
-    var registeredMarkers = Object.create(null);
-    var dom = tag.dom;
+  // We will store registered markers in javascript map, to avoid calls to dom:
+  var registeredMarkers = Object.create(null);
+  var dom = tag.dom;
 
-    return function (newColor) {
-      var defKey = registeredMarkers[newColor];
-      // if color is not yet seen, register new def entry:
-      if (!defKey) defKey = registerNewMarker(newColor);
+  return function (newColor) {
+    var defKey = registeredMarkers[newColor];
+    // if color is not yet seen, register new def entry:
+    if (!defKey) defKey = registerNewMarker(newColor);
 
-      // finally set attributes on path itself:
-      dom.setAttributeNS(null, 'stroke', newColor);
-      dom.setAttributeNS(null, 'marker-end', 'url(#' + defKey + ')');
-    };
+    // finally set attributes on path itself:
+    dom.setAttributeNS(null, 'stroke', newColor);
+    dom.setAttributeNS(null, 'marker-end', 'url(#' + defKey + ')');
+  };
 
-    // boring dom manipulation to create actual `defs > marker` tag
-    function registerNewMarker(color) {
-      var id = 'triangle' + color;
-      registeredMarkers[color] = id;
+  // boring dom manipulation to create actual `defs > marker` tag
+  function registerNewMarker(color) {
+    var id = 'triangle' + color;
+    registeredMarkers[color] = id;
 
-      var defs = getDefs(dom.ownerSVGElement);
-      vivasvg.appendTo(defs, [
-        '<marker id="' + id + '" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="strokeWidth"',
-        '        markerWidth="10" markerHeight="5" orient="auto"',
-        '        style="fill: "' + color + '>',
-        '  <path d="M 0 0 L 10 5 L 0 10 z"></path>',
-        '</marker>'].join('\n'));
-    }
+    var defs = getDefs(dom.ownerSVGElement);
+    vivasvg.appendTo(defs, [
+      '<marker id="' + id + '" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="strokeWidth"',
+      '        markerWidth="10" markerHeight="5" orient="auto"',
+      '        style="fill: "' + color + '>',
+      '  <path d="M 0 0 L 10 5 L 0 10 z"></path>',
+      '</marker>'].join('\n'));
+  }
 
-    function getDefs(svgRoot) {
-      return svgRoot.getElementsByTagName('defs')[0] ||
-             vivasvg.appendTo(svgRoot, '<defs></defs>');
-    }
+  function getDefs(svgRoot) {
+    return svgRoot.getElementsByTagName('defs')[0] ||
+            vivasvg.appendTo(svgRoot, '<defs></defs>');
   }
 });
 ```
