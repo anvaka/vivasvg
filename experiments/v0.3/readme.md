@@ -82,6 +82,13 @@ createAttribute('items', 'source', function (itemsTag) {
 );
 ```
 
+`items` tag simply redefines template, and will insert svg group instead of itself.
+Shortcut for it could be:
+
+```
+createTag('items', '<g></g>');
+```
+
 ## Arrow
 
 Arrows are not supported in SVG by default. To create a simple arrow in regular
