@@ -71,7 +71,7 @@ createTag('items', function (itemsTag) {
   itemsTag.template('<g></g>');
 
   function sourceAttributeChanged(items) {
-    var itemTemplate = item.children[0]; // store into closure for quick access
+    var itemTemplate = items.children[0]; // store into closure for quick access
 
     return function (sourceValue) {
       // we assume sourceValue is a collection
